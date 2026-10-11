@@ -78,8 +78,10 @@ func (f apiFlags) body() (map[string]any, error) {
 	return out, nil
 }
 
-// setInput sends a raw body: FILE, or stdin for "-". The content type stays
-// unset unless -H gave one, so add 'Content-Type: ...' when the endpoint cares.
+// setInput sends a raw body: FILE, or stdin for "-". Without a -H Content-Type the
+// body is labelled application/json when it parses as JSON, else
+// application/octet-stream: a grobase edge (ModSecurity CRS 920340) refuses a body
+// that carries no content type at all.
 func (f apiFlags) setInput(e *env.Env, req *httpx.Request) error {
 	var body []byte
 	var err error
@@ -93,6 +95,12 @@ func (f apiFlags) setInput(e *env.Env, req *httpx.Request) error {
 	}
 	req.Body = bytes.NewReader(body)
 	req.ContentLength = int64(len(body))
+	if req.Header.Get("Content-Type") == "" {
+		req.ContentType = "application/octet-stream"
+		if json.Valid(body) {
+			req.ContentType = "application/json"
+		}
+	}
 	return nil
 }
 

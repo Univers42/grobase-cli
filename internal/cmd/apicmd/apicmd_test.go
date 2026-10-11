@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,8 +18,8 @@ import (
 const anonKey = "anon-key-api-123"
 
 type seen struct {
-	method, uri, body string
-	hits              int
+	method, uri, body, ctype string
+	hits                     int
 }
 
 func call(t *testing.T, status int, reply string, args ...string) (int, *seen, string) {
@@ -26,6 +28,7 @@ func call(t *testing.T, status int, reply string, args ...string) (int, *seen, s
 	h := testenv.New(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		s.method, s.uri, s.body, s.hits = r.Method, r.URL.RequestURI(), string(b), s.hits+1
+		s.ctype = r.Header.Get("Content-Type")
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(reply))
 	}), map[string]string{secret.KindAnon: anonKey}, "")
@@ -79,6 +82,31 @@ func TestAPIBadFlags(t *testing.T) {
 	for _, args := range [][]string{{"GET", "/x", "-f", "novalue"}, {"GET", "/x", "-H", "nocolon"}, {"GET", "/x", "--max-pages", "0"}, {"GET"}} {
 		if code, s, _ := call(t, 200, `{}`, args...); code != exitcode.Usage || s.hits != 0 {
 			t.Errorf("%v: exit %d, hits %d", args, code, s.hits)
+		}
+	}
+}
+
+// TestAPIInputContentType: a raw --input body is labelled JSON when it parses, else
+// octet-stream, and an explicit -H Content-Type always wins.
+func TestAPIInputContentType(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct{ body, header, want string }{
+		{`{"a":1}`, "", "application/json"},
+		{"not json", "", "application/octet-stream"},
+		{`{"a":1}`, "Content-Type: text/csv", "text/csv"},
+	}
+	for i, c := range cases {
+		path := filepath.Join(dir, strings.Repeat("x", i+1))
+		if err := os.WriteFile(path, []byte(c.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		args := []string{"POST", "/rest/v1/things", "--input", path}
+		if c.header != "" {
+			args = append(args, "-H", c.header)
+		}
+		code, s, out := call(t, 201, `{}`, args...)
+		if code != 0 || s.ctype != c.want || s.body != c.body {
+			t.Errorf("%q: exit %d, content type %q want %q, body %q (%s)", c.body, code, s.ctype, c.want, s.body, out)
 		}
 	}
 }

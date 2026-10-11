@@ -28,7 +28,7 @@ grobase api METHOD PATH [flags]
   -H, --header stringArray      extra header, 'Name: value' (repeatable)
   -h, --help                    help for api
       --include                 print the status line and headers to stderr
-      --input string            raw body from FILE ("-" means stdin)
+      --input string            raw body from FILE ("-" means stdin); sent as application/json when it parses, else octet-stream, unless -H sets Content-Type
       --max-pages int           stop after that many pages (with --paginate) (default 100)
       --mode string             credential to send: auto, user, service, apikey, anon or none (default "auto")
       --paginate                follow every page until the results are exhausted

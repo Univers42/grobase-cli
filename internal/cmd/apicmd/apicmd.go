@@ -48,7 +48,7 @@ exactly as received.`,
 	fl.StringArrayVarP(&f.fields, "raw-field", "f", nil, "string field, key=value (repeatable)")
 	fl.StringArrayVarP(&f.typed, "field", "F", nil, "typed field, key=value: true/false/null/number, else string (repeatable)")
 	fl.StringArrayVarP(&f.headers, "header", "H", nil, "extra header, 'Name: value' (repeatable)")
-	fl.StringVar(&f.input, "input", "", "raw body from FILE (\"-\" means stdin)")
+	fl.StringVar(&f.input, "input", "", "raw body from FILE (\"-\" means stdin); sent as application/json when it parses, else octet-stream, unless -H sets Content-Type")
 	fl.BoolVar(&f.paginate, "paginate", false, "follow every page until the results are exhausted")
 	fl.IntVar(&f.maxPages, "max-pages", 100, "stop after that many pages (with --paginate)")
 	fl.BoolVar(&f.include, "include", false, "print the status line and headers to stderr")
