@@ -36,6 +36,7 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 authentication/authorization, 4 not found 
 * [grobase orgs](grobase_orgs.md)	 - Manage organisations, their members, invites and projects
 * [grobase query](grobase_query.md)	 - Run SQL and row CRUD against a mounted database
 * [grobase realtime](grobase_realtime.md)	 - Subscribe to and publish on realtime channels over WebSocket
+* [grobase signup](grobase_signup.md)	 - Create an account and sign in when the deployment auto-confirms emails
 * [grobase status](grobase_status.md)	 - Probe every endpoint of the current context and report its state
 * [grobase storage](grobase_storage.md)	 - Manage the buckets and objects of the current tenant
 * [grobase tenants](grobase_tenants.md)	 - Show the current tenant's profile, resource usage and entitlements

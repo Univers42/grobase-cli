@@ -17,6 +17,7 @@ Requires Go 1.26. Cross-builds (linux/darwin/windows, amd64/arm64) run in CI.
 ```sh
 grobase context add lab --url https://gateway.example:8443   # shows the cert fingerprint, asks to pin it (TOFU)
 grobase status                                                # unauthenticated probe of every endpoint
+grobase signup --email you@example.com --password-stdin       # creates the account (and signs in when the server auto-confirms)
 grobase login                                                 # prompts; or: echo "$PW" | grobase login --email me@x.io --password-stdin
 grobase whoami
 grobase users list --jq '.[].email'
@@ -69,7 +70,7 @@ Exit codes: `0` ok, `1` error, `2` usage, `3` authentication/authorization, `4` 
 
 ## Commands
 
-`api`, `apps`, `completion`, `context`, `db`, `doctor`, `functions`, `keys`, `login`, `logout`, `orgs`, `query`, `realtime`, `status`, `storage`, `tenants`, `token`, `users`, `version`, `whoami`.
+`api`, `apps`, `completion`, `context`, `db`, `doctor`, `functions`, `keys`, `login`, `logout`, `orgs`, `query`, `realtime`, `signup`, `status`, `storage`, `tenants`, `token`, `users`, `version`, `whoami`.
 
 The full reference is generated from the cobra tree (`grobase docs DIR`, hidden) and committed in [docs/commands](docs/commands). Regenerate with `grobase docs docs/commands`.
 

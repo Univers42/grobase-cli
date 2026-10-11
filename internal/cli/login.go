@@ -113,11 +113,10 @@ func loginStaticKey(ctx context.Context, e *env.Env, store secret.Store, c confi
 }
 
 func loginEmail(ctx context.Context, e *env.Env, store secret.Store, c config.Context, f loginFlags) error {
-	anon, err := store.Get(secret.Name(c.Name, secret.KindAnon))
+	anon, err := storedAnonKey(e, store, c.Name)
 	if err != nil {
-		return exitcode.Usagef("no anon key stored for %q: pass --anon-key-stdin or set GROBASE_ANON_KEY", c.Name)
+		return err
 	}
-	e.Redact.Add(anon)
 	plain, err := e.HTTPClient(c, false)
 	if err != nil {
 		return err
@@ -135,15 +134,30 @@ func loginEmail(ctx context.Context, e *env.Env, store secret.Store, c config.Co
 	if err != nil {
 		return err
 	}
-	enc, err := sess.Encode()
-	if err != nil {
-		return err
-	}
-	if err := store.Set(secret.Name(c.Name, secret.KindSession), enc); err != nil {
+	if err := storeSession(store, c, sess); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(e.Stdout, "logged in to %q as %s\n", c.Name, sess.Email)
 	return err
+}
+
+// storedAnonKey returns the anon key GoTrue needs, redacting it like a secret.
+func storedAnonKey(e *env.Env, store secret.Store, ctxName string) (string, error) {
+	anon, err := store.Get(secret.Name(ctxName, secret.KindAnon))
+	if err != nil {
+		return "", exitcode.Usagef("no anon key stored for %q: pass --anon-key-stdin or set GROBASE_ANON_KEY", ctxName)
+	}
+	e.Redact.Add(anon)
+	return anon, nil
+}
+
+// storeSession encodes sess and saves it as the session of the context.
+func storeSession(store secret.Store, c config.Context, sess auth.Session) error {
+	enc, err := sess.Encode()
+	if err != nil {
+		return err
+	}
+	return store.Set(secret.Name(c.Name, secret.KindSession), enc)
 }
 
 func otpLogin(ctx context.Context, e *env.Env, g *auth.GoTrue, anon, email string) (auth.Session, error) {

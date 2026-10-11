@@ -51,7 +51,7 @@ func NewRoot(deps env.Deps, info BuildInfo) (*cobra.Command, *env.Env) {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return &exitcode.UsageError{Msg: err.Error()} })
 	bindFlags(root, flags)
 	root.AddCommand(
-		newContextCmd(e), newLoginCmd(e), newLogoutCmd(e), newWhoamiCmd(e), newTokenCmd(e),
+		newContextCmd(e), newLoginCmd(e), newSignupCmd(e), newLogoutCmd(e), newWhoamiCmd(e), newTokenCmd(e),
 		newVersionCmd(e, info), newDocsCmd(root),
 		users.New(e), keys.New(e), apps.New(e), tenants.New(e), db.New(e), orgs.New(e), query.New(e),
 		apicmd.New(e), storage.New(e), realtime.New(e), functions.New(e), status.New(e), doctor.New(e),

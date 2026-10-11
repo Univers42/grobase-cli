@@ -34,6 +34,28 @@ func (g *GoTrue) token(ctx context.Context, anon, grant string, body any) (Sessi
 	return tr.session(g.Clock())
 }
 
+// Signup creates an account. The bool is true when the deployment auto-confirms
+// emails and the answer carries a session to store; it is false when GoTrue
+// answered with a bare user object, i.e. the address must be confirmed first.
+func (g *GoTrue) Signup(ctx context.Context, anon, email, password string) (Session, bool, error) {
+	var tr tokenResponse
+	err := g.Client.JSON(ctx, httpx.Request{
+		Method: "POST", Path: "/auth/v1/signup", Header: g.anonHeader(anon), Mode: httpx.ModeNone,
+		JSON: map[string]string{"email": email, "password": password},
+	}, &tr)
+	if err != nil {
+		return Session{}, false, err
+	}
+	if tr.AccessToken == "" {
+		return Session{}, false, nil
+	}
+	sess, err := tr.session(g.Clock())
+	if err != nil {
+		return Session{}, false, err
+	}
+	return sess, true, nil
+}
+
 // Password signs in with email and password.
 func (g *GoTrue) Password(ctx context.Context, anon, email, password string) (Session, error) {
 	return g.token(ctx, anon, "password", map[string]string{"email": email, "password": password})
