@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Univers42/grobase-cli/internal/auth"
+	"github.com/Univers42/grobase-cli/internal/config"
 	"github.com/Univers42/grobase-cli/internal/httpx"
 	"github.com/Univers42/grobase-cli/internal/secret"
 )
@@ -41,7 +42,7 @@ func Of(err error) int {
 		return AuthFail
 	case errors.As(err, &ae) && ae.Unauthorized():
 		return AuthFail
-	case errors.As(err, &ae) && ae.NotFound(), errors.Is(err, fs.ErrNotExist):
+	case errors.As(err, &ae) && ae.NotFound(), errors.Is(err, fs.ErrNotExist), errors.Is(err, config.ErrNoContext):
 		return NotFound
 	}
 	return Failure

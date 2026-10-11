@@ -72,6 +72,9 @@ func (c Context) Validate() error {
 	if u.User != nil {
 		return errors.New("url must not embed credentials")
 	}
+	if c.Insecure && (c.CAFile != "" || c.PinSHA256 != "") {
+		return errors.New("insecure cannot be combined with a CA file or a pin: pick one trust mode")
+	}
 	if c.PinSHA256 != "" && !validPin(c.PinSHA256) {
 		return errors.New("pin_sha256 must be 64 lowercase hex characters")
 	}
