@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Univers42/grobase-cli/internal/cmd/apicmd"
+	"github.com/Univers42/grobase-cli/internal/cmd/apps"
 	"github.com/Univers42/grobase-cli/internal/cmd/db"
 	"github.com/Univers42/grobase-cli/internal/cmd/doctor"
 	"github.com/Univers42/grobase-cli/internal/cmd/functions"
@@ -39,7 +40,7 @@ func NewRoot(deps env.Deps, info BuildInfo) (*cobra.Command, *env.Env) {
 		Use:   "grobase",
 		Short: "Remote controller for a self-hosted grobase platform",
 		Long: "grobase manages a grobase deployment from the command line: contexts, credentials, users,\n" +
-			"API keys, database mounts, queries, storage, realtime and functions.\n\n" +
+			"API keys, apps, database mounts, queries, storage, realtime and functions.\n\n" +
 			"Exit codes: 0 ok, 1 error, 2 usage, 3 authentication/authorization, 4 not found or not enabled.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -52,7 +53,7 @@ func NewRoot(deps env.Deps, info BuildInfo) (*cobra.Command, *env.Env) {
 	root.AddCommand(
 		newContextCmd(e), newLoginCmd(e), newLogoutCmd(e), newWhoamiCmd(e), newTokenCmd(e),
 		newVersionCmd(e, info), newDocsCmd(root),
-		users.New(e), keys.New(e), tenants.New(e), db.New(e), orgs.New(e), query.New(e),
+		users.New(e), keys.New(e), apps.New(e), tenants.New(e), db.New(e), orgs.New(e), query.New(e),
 		apicmd.New(e), storage.New(e), realtime.New(e), functions.New(e), status.New(e), doctor.New(e),
 	)
 	return root, e

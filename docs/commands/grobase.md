@@ -5,7 +5,7 @@ Remote controller for a self-hosted grobase platform
 ### Synopsis
 
 grobase manages a grobase deployment from the command line: contexts, credentials, users,
-API keys, database mounts, queries, storage, realtime and functions.
+API keys, apps, database mounts, queries, storage, realtime and functions.
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 authentication/authorization, 4 not found or not enabled.
 
@@ -24,6 +24,7 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 authentication/authorization, 4 not found 
 ### SEE ALSO
 
 * [grobase api](grobase_api.md)	 - Call any endpoint of the current context
+* [grobase apps](grobase_apps.md)	 - Manage the account's self-serve apps
 * [grobase completion](grobase_completion.md)	 - Generate the autocompletion script for the specified shell
 * [grobase context](grobase_context.md)	 - Manage deployments (contexts)
 * [grobase db](grobase_db.md)	 - Manage the database mounts of the current tenant

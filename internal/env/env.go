@@ -198,6 +198,26 @@ func (e *Env) ReadLine() (string, error) {
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
+// ConfirmDestructive gates a destructive action: --yes skips the prompt. A
+// non-interactive caller must pass --yes; a declined prompt cancels as a usage
+// error, so nothing was sent to the server.
+func (e *Env) ConfirmDestructive(yes bool, action string) error {
+	if yes {
+		return nil
+	}
+	if !e.Interactive() {
+		return exitcode.Usagef("pass --yes to confirm: %s", action)
+	}
+	ok, err := e.Confirm(action + "? this cannot be undone")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return exitcode.Usagef("cancelled; nothing was %s", action)
+	}
+	return nil
+}
+
 // Confirm asks a yes/no question on stderr and reads the answer from stdin.
 func (e *Env) Confirm(question string) (bool, error) {
 	_, _ = fmt.Fprintf(e.Stderr, "%s [y/N]: ", question)

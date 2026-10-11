@@ -59,7 +59,7 @@ Exit codes: `0` ok, `1` error, `2` usage, `3` authentication/authorization, `4` 
 
 ## Commands
 
-`api`, `completion`, `context`, `db`, `doctor`, `functions`, `keys`, `login`, `logout`, `orgs`, `query`, `realtime`, `status`, `storage`, `tenants`, `token`, `users`, `version`, `whoami`.
+`api`, `apps`, `completion`, `context`, `db`, `doctor`, `functions`, `keys`, `login`, `logout`, `orgs`, `query`, `realtime`, `status`, `storage`, `tenants`, `token`, `users`, `version`, `whoami`.
 
 The full reference is generated from the cobra tree (`grobase docs DIR`, hidden) and committed in [docs/commands](docs/commands). Regenerate with `grobase docs docs/commands`.
 
@@ -86,7 +86,7 @@ See [SECURITY.md](SECURITY.md). In short:
 
 ## What it does not do
 
-- No `migrations` command, and no separate `apps` command: apps are the `tenants` commands.
+- No `migrations` command: grobase's migration route (`/admin/v1/migrate`) is an internal admin route that takes a raw database mount, not a user-facing API. `apps` needs the server's self-serve apps enabled; otherwise it reports not enabled.
 - `functions deploy` has no `--runtime` flag. `functions logs` cannot tell a missing function from a missing route (both 404).
 - A certificate pin skips expiry and hostname checks by design (the pin is the trust anchor); `doctor` reports expiry separately.
 - The "not enabled" wording is inferred from a 404 on a feature root; it cannot distinguish a disabled feature from a wrong path.

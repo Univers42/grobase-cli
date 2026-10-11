@@ -6,7 +6,6 @@ import (
 	"io/fs"
 
 	"github.com/Univers42/grobase-cli/internal/env"
-	"github.com/Univers42/grobase-cli/internal/exitcode"
 	"github.com/Univers42/grobase-cli/internal/httpx"
 )
 
@@ -64,25 +63,6 @@ func printNewKey(e *env.Env, resp map[string]any) error {
 		return err
 	}
 	e.Warnf("store this key now; it cannot be shown again")
-	return nil
-}
-
-// gate confirms a destructive action: --yes skips the prompt. A non-interactive
-// caller must pass --yes; a declined prompt cancels as a usage error.
-func gate(e *env.Env, yes bool, action string) error {
-	if yes {
-		return nil
-	}
-	if !e.Interactive() {
-		return exitcode.Usagef("pass --yes to confirm: %s", action)
-	}
-	ok, err := e.Confirm(action + "? this cannot be undone")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return exitcode.Usagef("cancelled; nothing was %s", action)
-	}
 	return nil
 }
 

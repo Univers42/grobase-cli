@@ -73,7 +73,7 @@ func newRevokeCmd(e *env.Env) *cobra.Command {
 		Short: "Revoke an API key",
 		Args:  exitcode.Args(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := gate(e, yes, "revoke key "+args[0]); err != nil {
+			if err := e.ConfirmDestructive(yes, "revoke key "+args[0]); err != nil {
 				return err
 			}
 			cl, _, err := e.Client()
@@ -98,7 +98,7 @@ func newRotateCmd(e *env.Env) *cobra.Command {
 		Args:  exitcode.Args(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id := args[0]
-			if err := gate(e, yes, "rotate key "+id); err != nil {
+			if err := e.ConfirmDestructive(yes, "rotate key "+id); err != nil {
 				return err
 			}
 			cl, _, err := e.Client()
