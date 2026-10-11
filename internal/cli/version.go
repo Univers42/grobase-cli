@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -31,6 +32,9 @@ func newDocsCmd(root *cobra.Command) *cobra.Command {
 		Hidden: true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			root.DisableAutoGenTag = true
+			if err := os.MkdirAll(args[0], 0o750); err != nil {
+				return err
+			}
 			return doc.GenMarkdownTree(root, args[0])
 		},
 	}

@@ -1,0 +1,27 @@
+## grobase orgs invites
+
+Manage the invitations of an organisation
+
+### Options
+
+```
+  -h, --help   help for invites
+```
+
+### Options inherited from parent commands
+
+```
+      --context string            context to use (default: the current context)
+      --credential-store string   credential backend: auto, keyring or file (default "auto")
+      --debug                     trace HTTP requests to stderr (credentials are redacted)
+      --jq string                 filter the result with a jq expression (prints JSON lines)
+  -o, --output string             output format: table, json or yaml (default "table")
+      --timeout duration          time to wait for response headers (default 30s)
+```
+
+### SEE ALSO
+
+* [grobase orgs](grobase_orgs.md)	 - Manage organisations, their members, invites and projects
+* [grobase orgs invites create](grobase_orgs_invites_create.md)	 - Invite someone to an organisation
+* [grobase orgs invites list](grobase_orgs_invites_list.md)	 - List the invitations of an organisation
+
