@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -62,4 +63,16 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// NotEnabled relabels a 404 on a feature's root route as "not enabled on this
+// deployment" (flag-gated routes answer 404 when off), keeping the cause for exit-code
+// mapping. Ponytail: it cannot tell a disabled feature from a wrong path; call it only
+// on collection roots, never on id-scoped routes.
+func NotEnabled(what string, err error) error {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.NotFound() {
+		return fmt.Errorf("%s: not enabled on this deployment: %w", what, err)
+	}
+	return err
 }

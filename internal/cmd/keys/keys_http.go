@@ -2,7 +2,6 @@ package keys
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 
@@ -18,7 +17,7 @@ func listKeys(ctx context.Context, cl *httpx.Client) ([]any, error) {
 	var raw any
 	req := httpx.Request{Method: "GET", Path: keysPath, Mode: httpx.ModeAuto}
 	if err := cl.JSON(ctx, req, &raw); err != nil {
-		return nil, notEnabled("keys", err)
+		return nil, httpx.NotEnabled("keys", err)
 	}
 	return extractKeys(raw)
 }
@@ -32,7 +31,7 @@ func createKey(ctx context.Context, cl *httpx.Client, name string, scopes []stri
 	var resp map[string]any
 	req := httpx.Request{Method: "POST", Path: keysPath, JSON: body, Mode: httpx.ModeAuto}
 	if err := cl.JSON(ctx, req, &resp); err != nil {
-		return nil, notEnabled("keys", err)
+		return nil, httpx.NotEnabled("keys", err)
 	}
 	return resp, nil
 }
@@ -99,15 +98,6 @@ func extractKeys(raw any) ([]any, error) {
 		}
 	}
 	return nil, fmt.Errorf("unexpected keys response: %T (want an array or {\"keys\":[...]})", raw)
-}
-
-// notEnabled relabels a 404 on the keys root as "not enabled on this deployment".
-func notEnabled(what string, err error) error {
-	var apiErr *httpx.APIError
-	if errors.As(err, &apiErr) && apiErr.NotFound() {
-		return fmt.Errorf("%s: not enabled on this deployment: %w", what, err)
-	}
-	return err
 }
 
 func stringField(m map[string]any, k string) string {

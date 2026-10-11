@@ -3,8 +3,6 @@ package tenants
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -54,17 +52,7 @@ func get(ctx context.Context, e *env.Env, what, path string) error {
 	}
 	var out any
 	if err := cl.JSON(ctx, httpx.Request{Method: "GET", Path: path, Mode: httpx.ModeAuto}, &out); err != nil {
-		return notEnabled("tenants "+what, err)
+		return httpx.NotEnabled("tenants "+what, err)
 	}
 	return e.Printer().Print(out)
-}
-
-// notEnabled relabels a 404 on a tenant route as "not enabled on this
-// deployment"; tenant routes are never id-scoped, so every 404 qualifies.
-func notEnabled(what string, err error) error {
-	var apiErr *httpx.APIError
-	if errors.As(err, &apiErr) && apiErr.NotFound() {
-		return fmt.Errorf("%s: not enabled on this deployment: %w", what, err)
-	}
-	return err
 }
