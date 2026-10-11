@@ -30,6 +30,7 @@ type run struct {
 	ctx    context.Context
 	e      *env.Env
 	conf   config.Context
+	url    string        // the URL in use: the first of URL + alternates that answered
 	plain  *httpx.Client // probes that send no credential
 	authed *httpx.Client // the auth check only; nil when the store cannot be opened
 }
@@ -44,6 +45,7 @@ func newRun(ctx context.Context, e *env.Env) *run {
 		return r
 	}
 	r.conf = c
+	r.url, _ = e.SelectedURL(c) // memoized: HTTPClient below reuses this pick
 	r.plain, _ = e.HTTPClient(c, false)
 	r.authed, _, _ = e.Client()
 	return r
@@ -101,7 +103,7 @@ func checkReach(r *run) []check {
 	if a.err != nil {
 		return row("dns/reachability", resultFail, a.err.Error())
 	}
-	return row("dns/reachability", resultPass, fmt.Sprintf("%s in %dms", a.status, a.ms))
+	return row("dns/reachability", resultPass, fmt.Sprintf("%s in %dms via %s", a.status, a.ms, r.url))
 }
 
 // 3. TLS: how the context trusts the certificate it is presented.
@@ -109,9 +111,9 @@ func checkTLS(r *run) []check {
 	if r.plain == nil {
 		return skipped("tls")
 	}
-	u, err := url.Parse(r.conf.URL)
+	u, err := url.Parse(r.url)
 	if err != nil {
-		return row("tls", resultFail, fmt.Sprintf("invalid url %q: %v", r.conf.URL, err))
+		return row("tls", resultFail, fmt.Sprintf("invalid url %q: %v", r.url, err))
 	}
 	if u.Scheme != "https" {
 		return row("tls", resultWarn, "plaintext http: traffic can be read and altered on the path")
