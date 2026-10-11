@@ -23,6 +23,7 @@ Manage deployments (contexts)
 
 * [grobase](grobase.md)	 - Remote controller for a self-hosted grobase platform
 * [grobase context add](grobase_context_add.md)	 - Add (or replace) a context; pins the server certificate on first use when it is untrusted
+* [grobase context env](grobase_context_env.md)	 - Print shell assignments for the chosen URL of a context
 * [grobase context list](grobase_context_list.md)	 - List contexts
 * [grobase context pin](grobase_context_pin.md)	 - Re-pin the server certificate of a context (after a rotation)
 * [grobase context remove](grobase_context_remove.md)	 - Remove a context and its stored credentials

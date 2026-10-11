@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -218,5 +220,81 @@ func TestVersionAndHelpExitZero(t *testing.T) {
 	}
 	if code := w.run("--help"); code != 0 {
 		t.Fatalf("help: exit %d", code)
+	}
+}
+
+func TestContextAddDedupsAlternates(t *testing.T) {
+	a := httptest.NewServer(http.NotFoundHandler())
+	defer a.Close()
+	b := httptest.NewServer(http.NotFoundHandler())
+	defer b.Close()
+	w := newWorld(t, http.NotFoundHandler(), "")
+	if code := w.run("context", "add", "dc", "--url", a.URL, "--url", b.URL, "--url", a.URL); code != 0 {
+		t.Fatalf("add exit %d: %s", code, w.errb)
+	}
+	w.out.Reset()
+	if code := w.run("context", "show", "dc", "-o", "json"); code != 0 {
+		t.Fatalf("show exit %d: %s", code, w.errb)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(w.out.Bytes(), &got); err != nil {
+		t.Fatalf("show not JSON: %v", err)
+	}
+	if got["url"] != a.URL {
+		t.Fatalf("url = %v want %s", got["url"], a.URL)
+	}
+	alts, _ := got["alternates"].([]any)
+	if len(alts) != 1 || alts[0] != b.URL {
+		t.Fatalf("alternates = %v want [%s]", got["alternates"], b.URL)
+	}
+}
+
+func TestContextEnvPrintsQuotedVars(t *testing.T) {
+	w := newWorld(t, http.NotFoundHandler(), "")
+	ca := t.TempDir() + "/a'b.pem"
+	if err := os.WriteFile(ca, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	if code := w.run("context", "add", "dc", "--url", srv.URL, "--ca-file", ca); code != 0 {
+		t.Fatalf("add exit %d: %s", code, w.errb)
+	}
+	w.out.Reset()
+	if code := w.run("context", "env", "dc"); code != 0 {
+		t.Fatalf("env exit %d: %s", code, w.errb)
+	}
+	abs, _ := filepath.Abs(ca)
+	want := "GROBASE_TARGET='" + srv.URL + "'\nGROBASE_CA_FILE='" + strings.ReplaceAll(abs, "'", "'\\''") + "'\n"
+	if w.out.String() != want {
+		t.Fatalf("env = %q want %q", w.out, want)
+	}
+	w.out.Reset()
+	if code := w.run("context", "env", "t"); code != 0 {
+		t.Fatalf("env t exit %d: %s", code, w.errb)
+	}
+	lines := strings.Split(strings.TrimSuffix(w.out.String(), "\n"), "\n")
+	if len(lines) != 1 || !strings.HasPrefix(lines[0], "GROBASE_TARGET='") {
+		t.Fatalf("env t = %q want one GROBASE_TARGET line", w.out)
+	}
+}
+
+func TestContextEnvNoURLAnswered(t *testing.T) {
+	s1 := httptest.NewServer(http.NotFoundHandler())
+	s2 := httptest.NewServer(http.NotFoundHandler())
+	u1, u2 := s1.URL, s2.URL
+	s1.Close()
+	s2.Close()
+	w := newWorld(t, http.NotFoundHandler(), "")
+	if code := w.run("context", "add", "dc", "--url", u1, "--url", u2); code != 0 {
+		t.Fatalf("add exit %d: %s", code, w.errb)
+	}
+	w.out.Reset()
+	w.errb.Reset()
+	if code := w.run("context", "env", "dc"); code == 0 {
+		t.Fatal("env with closed URLs must fail")
+	}
+	if !strings.Contains(w.errb.String(), "no URL answered") {
+		t.Fatalf("stderr = %q want no URL answered", w.errb)
 	}
 }

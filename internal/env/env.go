@@ -61,10 +61,12 @@ type Env struct {
 	Flags  *Flags
 	Redact *redact.Redactor
 
-	once  sync.Once
-	store secret.Store
-	err   error
-	stdin *bufio.Reader
+	once   sync.Once
+	store  secret.Store
+	err    error
+	stdin  *bufio.Reader
+	mu     sync.Mutex
+	picked map[string]string
 }
 
 // New returns an Env over deps and flags.
@@ -115,6 +117,7 @@ func (e *Env) Secrets() (secret.Store, error) {
 	return e.store, e.err
 }
 
+// passphrase returns the credential-file passphrase from the environment or a prompt.
 func (e *Env) passphrase() ([]byte, error) {
 	if p := e.Getenv("GROBASE_PASSPHRASE"); p != "" {
 		return []byte(p), nil
@@ -128,7 +131,11 @@ func (e *Env) passphrase() ([]byte, error) {
 
 // HTTPClient builds a client for ctx. With withAuth the client injects stored credentials.
 func (e *Env) HTTPClient(c config.Context, withAuth bool) (*httpx.Client, error) {
-	base, err := url.Parse(c.URL)
+	target, err := e.SelectedURL(c)
+	if err != nil {
+		return nil, err
+	}
+	base, err := url.Parse(target)
 	if err != nil {
 		return nil, fmt.Errorf("context %q: %w", c.Name, err)
 	}
@@ -173,6 +180,7 @@ func (e *Env) ReadSecret(prompt string, fromStdin bool, envVar string) (string, 
 	return v, err
 }
 
+// readSecret resolves one secret from stdin, the environment or a prompt.
 func (e *Env) readSecret(prompt string, fromStdin bool, envVar string) (string, error) {
 	switch {
 	case fromStdin:

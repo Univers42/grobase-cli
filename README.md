@@ -25,6 +25,16 @@ grobase api /v1/tenants/me
 
 Secrets are never flag values: they come from a prompt, stdin or an environment variable.
 
+## Contexts
+
+One deployment is reachable under several URLs depending on the network. A context holds all of them and uses the first that answers:
+
+```sh
+grobase context add dc --url https://grobase.track-binocle.test:8443 --url https://100.94.119.97:8443 --url https://127.0.0.1:8443 --ca-file ca.pem
+```
+
+`grobase context env` prints `GROBASE_TARGET` and `GROBASE_CA_FILE` for the reachable URL, for `make` and shells to consume.
+
 ## Output
 
 Real output, captured against a local fake gateway that only answers `/auth/v1/health`, `/rest/` and `/storage/` (so the rest correctly reads "not enabled"):

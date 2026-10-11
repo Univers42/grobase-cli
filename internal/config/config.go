@@ -18,6 +18,8 @@ type Context struct {
 	Name string `json:"name"`
 	// URL is the Kong edge, e.g. https://host:8443.
 	URL string `json:"url"`
+	// Alternates holds fallback edge URLs, tried in order after URL.
+	Alternates []string `json:"alternates,omitempty"`
 	// CAFile is an optional PEM bundle trusted in addition to the system roots.
 	CAFile string `json:"ca_file,omitempty"`
 	// PinSHA256 is the lowercase hex SHA-256 of the pinned leaf certificate (DER).
@@ -32,6 +34,7 @@ type File struct {
 	Contexts map[string]Context `json:"contexts"`
 }
 
+// validName reports whether s is a usable context name.
 func validName(s string) bool {
 	if s == "" || len(s) > 63 || !isAlnum(s[0]) {
 		return false
@@ -44,10 +47,12 @@ func validName(s string) bool {
 	return true
 }
 
+// isAlnum reports whether c is an ASCII letter or digit.
 func isAlnum(c byte) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
 
+// validPin reports whether s is 64 lowercase hex characters.
 func validPin(s string) bool {
 	if len(s) != 64 {
 		return false
@@ -60,17 +65,30 @@ func validPin(s string) bool {
 	return true
 }
 
+// checkURL validates one edge URL exactly like the primary URL.
+func checkURL(s string) error {
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return fmt.Errorf("invalid url %q: want http(s)://host[:port]", s)
+	}
+	if u.User != nil {
+		return errors.New("url must not embed credentials")
+	}
+	return nil
+}
+
 // Validate checks a context before it is saved.
 func (c Context) Validate() error {
 	if !validName(c.Name) {
 		return fmt.Errorf("invalid context name %q: use letters, digits, '.', '_' or '-' (max 63)", c.Name)
 	}
-	u, err := url.Parse(c.URL)
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return fmt.Errorf("invalid url %q: want http(s)://host[:port]", c.URL)
+	if err := checkURL(c.URL); err != nil {
+		return err
 	}
-	if u.User != nil {
-		return errors.New("url must not embed credentials")
+	for _, a := range c.Alternates {
+		if err := checkURL(a); err != nil {
+			return err
+		}
 	}
 	if c.Insecure && (c.CAFile != "" || c.PinSHA256 != "") {
 		return errors.New("insecure cannot be combined with a CA file or a pin: pick one trust mode")
@@ -87,6 +105,9 @@ func (f *File) Add(c Context) error {
 		return err
 	}
 	c.URL = strings.TrimRight(c.URL, "/")
+	for i, a := range c.Alternates {
+		c.Alternates[i] = strings.TrimRight(a, "/")
+	}
 	if f.Contexts == nil {
 		f.Contexts = map[string]Context{}
 	}

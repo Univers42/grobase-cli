@@ -13,7 +13,7 @@ grobase context add NAME --url URL [flags]
   -h, --help                   help for add
       --insecure-skip-verify   DANGEROUS: do not verify the server certificate at all
       --pin-sha256 string      pin the server leaf certificate (hex SHA-256 of its DER)
-      --url string             edge URL, e.g. https://host:8443 (required)
+      --url stringArray        edge URL, e.g. https://host:8443 (repeatable; all URLs must present the same certificate)
       --yes                    accept the presented certificate fingerprint without asking
 ```
 
