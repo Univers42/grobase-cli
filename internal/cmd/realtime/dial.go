@@ -26,6 +26,9 @@ func dial(ctx context.Context, e *env.Env) (*websocket.Conn, error) {
 	// The context's *http.Client carries the TLS trust (CA, pin, insecure), so
 	// wss:// sockets verify exactly like the HTTPS calls do.
 	c, resp, derr := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPClient: cl.HTTP})
+	if resp != nil && resp.Body != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if derr == nil {
 		return c, nil
 	}

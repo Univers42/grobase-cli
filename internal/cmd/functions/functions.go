@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -77,7 +78,7 @@ func newDeployCmd(e *env.Env) *cobra.Command {
 }
 
 func deploy(ctx context.Context, e *env.Env, name, file, contentType string) error {
-	fh, err := os.Open(file)
+	fh, err := os.Open(filepath.Clean(file))
 	if err != nil {
 		return err
 	}

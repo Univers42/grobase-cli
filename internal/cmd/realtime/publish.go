@@ -59,7 +59,7 @@ func runPublish(ctx context.Context, e *env.Env, channel string, f publishFlags)
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 	msg := map[string]any{
 		"type": "broadcast", "channel": channel, "event": f.event,
-		"payload": json.RawMessage(payload),
+		"payload": payload,
 	}
 	if err := writeJSON(ctx, conn, msg); err != nil {
 		return err
