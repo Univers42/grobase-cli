@@ -45,7 +45,7 @@ func TestOrgsRoutesAndErrors(t *testing.T) {
 				_, _ = w.Write([]byte(`{"msg":"x"}`))
 			}), map[string]string{secret.KindAPIKey: "mbk_x"}, tc.stdin)
 			got := exitcode.Of(h.Run(orgs.New(h.Env), tc.args...))
-			if got != tc.want && !(tc.want == 1 && got != 0) {
+			if got != tc.want {
 				t.Fatalf("exit %d, want %d: %s", got, tc.want, h.Err)
 			}
 			if tc.method != "" && (gotMethod != tc.method || gotURI != tc.path) {
