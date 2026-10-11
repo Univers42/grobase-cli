@@ -4,8 +4,9 @@ Subscribe to and publish on realtime channels over WebSocket
 
 ### Synopsis
 
-The socket authenticates with the credentials of the current context, the same
-ones the HTTP commands use; nothing is passed on the command line.
+The socket authenticates with the session of the current context: an AUTH
+frame carries the same bearer the HTTP calls send, right after the upgrade.
+An anon-only context cannot use realtime; run `grobase login` first.
 
 ### Options
 

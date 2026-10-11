@@ -18,8 +18,9 @@ func New(e *env.Env) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "realtime",
 		Short: "Subscribe to and publish on realtime channels over WebSocket",
-		Long: "The socket authenticates with the credentials of the current context, the same\n" +
-			"ones the HTTP commands use; nothing is passed on the command line.",
+		Long: "The socket authenticates with the session of the current context: an AUTH\n" +
+			"frame carries the same bearer the HTTP calls send, right after the upgrade.\n" +
+			"An anon-only context cannot use realtime; run `grobase login` first.",
 		Args: exitcode.Args(cobra.NoArgs),
 	}
 	c.AddCommand(newSubscribeCmd(e), newPublishCmd(e))

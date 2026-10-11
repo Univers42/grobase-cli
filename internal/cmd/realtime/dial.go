@@ -2,46 +2,73 @@ package realtime
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/coder/websocket"
 
+	"github.com/Univers42/grobase-cli/internal/auth"
 	"github.com/Univers42/grobase-cli/internal/env"
+	"github.com/Univers42/grobase-cli/internal/exitcode"
 	"github.com/Univers42/grobase-cli/internal/httpx"
 )
 
-// dial opens the realtime socket of the current context.
-func dial(ctx context.Context, e *env.Env) (*websocket.Conn, error) {
+// dial opens the realtime socket of the current context and completes the AUTH
+// handshake: the first frame carries the session token and the gateway answers
+// AUTH_OK before the command may send anything else.
+func dial(ctx context.Context, e *env.Env, timeout time.Duration) (*websocket.Conn, error) {
 	cl, _, err := e.Client()
 	if err != nil {
 		return nil, err
 	}
-	u, err := dialURL(ctx, e, cl)
+	apikey, token, err := credentials(ctx, e, cl)
 	if err != nil {
 		return nil, err
 	}
-	// The context's *http.Client carries the TLS trust (CA, pin, insecure), so
-	// wss:// sockets verify exactly like the HTTPS calls do.
-	c, resp, derr := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPClient: cl.HTTP})
+	c, resp, derr := websocket.Dial(ctx, dialURL(cl, apikey), &websocket.DialOptions{HTTPClient: cl.HTTP})
 	if resp != nil && resp.Body != nil {
 		defer func() { _ = resp.Body.Close() }()
 	}
-	if derr == nil {
-		return c, nil
+	if derr != nil {
+		return nil, handshakeErr(e, resp, derr)
 	}
-	return nil, handshakeErr(e, resp, derr)
+	if err := authenticate(ctx, e, c, token, timeout); err != nil {
+		_ = c.CloseNow()
+		return nil, err
+	}
+	return c, nil
 }
 
-// dialURL turns the context URL into ws:// or wss:// and puts the credentials in
-// the query, the way the realtime service reads them.
-func dialURL(ctx context.Context, e *env.Env, cl *httpx.Client) (string, error) {
-	apikey, bearer, err := credentials(ctx, e, cl)
+// credentials resolves the apikey for the dial URL and the session token for the
+// AUTH frame, the same bearer the HTTP calls send. Realtime needs a logged-in
+// user: an anon-only context is a usage error before any connection is made.
+func credentials(ctx context.Context, e *env.Env, cl *httpx.Client) (apikey, token string, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cl.Base.String(), nil)
 	if err != nil {
-		return "", err
+		return "", "", fmt.Errorf("build credentials request: %w", err)
 	}
+	if err := cl.Auth.Authorize(ctx, req, httpx.ModeUser); err != nil {
+		if errors.Is(err, auth.ErrNoCredential) {
+			return "", "", exitcode.Usagef("realtime needs a logged-in user session: run `grobase login` first")
+		}
+		return "", "", err
+	}
+	apikey = req.Header.Get("apikey")
+	token = strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	e.Redact.Add(apikey)
+	e.Redact.Add(token)
+	return apikey, token, nil
+}
+
+// dialURL turns the context URL into ws:// or wss:// and keeps only the apikey in
+// the query; the bearer travels in the AUTH frame, never in the URL where
+// proxies log it.
+func dialURL(cl *httpx.Client, apikey string) string {
 	scheme := "ws"
 	if cl.Base.Scheme == "https" {
 		scheme = "wss"
@@ -50,32 +77,55 @@ func dialURL(ctx context.Context, e *env.Env, cl *httpx.Client) (string, error) 
 	if apikey != "" {
 		q.Set("apikey", apikey)
 	}
-	if bearer != "" {
-		q.Set("access_token", bearer)
-	}
 	u := *cl.Base
 	u.Scheme = scheme
 	u.Path = strings.TrimSuffix(u.Path, "/") + wsPath
 	u.RawQuery = q.Encode()
-	return u.String(), nil
+	return u.String()
 }
 
-// credentials asks the context's authorizer which headers it would send and
-// reads them back, so the socket authenticates like every other command.
-func credentials(ctx context.Context, e *env.Env, cl *httpx.Client) (apikey, bearer string, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cl.Base.String(), nil)
+// authenticate sends the AUTH frame and waits for AUTH_OK, bounded by timeout
+// when positive. A server ERROR is an auth failure carrying the server's code
+// and message; any other first frame or a close is a plain error.
+func authenticate(ctx context.Context, e *env.Env, c *websocket.Conn, token string, timeout time.Duration) error {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	if err := writeJSON(ctx, c, authFrame{Type: "AUTH", Token: token}); err != nil {
+		return e.Redact.Err(fmt.Errorf("send AUTH: %w", err))
+	}
+	typ, b, err := c.Read(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("build credentials request: %w", err)
+		return e.Redact.Err(fmt.Errorf("read AUTH_OK: %w", err))
 	}
-	if err := cl.Auth.Authorize(ctx, req, httpx.ModeAuto); err != nil {
-		return "", "", err
+	var f envelope
+	if typ != websocket.MessageText || json.Unmarshal(b, &f) != nil {
+		return e.Redact.Err(errors.New("malformed first frame from the gateway"))
 	}
-	apikey = req.Header.Get("apikey")
-	bearer = strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-	// The dial URL carries both, so every error that quotes it must be scrubbed.
-	e.Redact.Add(apikey)
-	e.Redact.Add(bearer)
-	return apikey, bearer, nil
+	switch f.Type {
+	case "AUTH_OK":
+		return nil
+	case "ERROR":
+		return e.Redact.Err(fmt.Errorf("authentication failed (%s): %s: %w", f.Code, f.Message, auth.ErrNoCredential))
+	default:
+		return e.Redact.Err(fmt.Errorf("unexpected first frame %q from the gateway", f.Type))
+	}
+}
+
+// authFrame is the first frame on the wire: the session token the gateway
+// authenticates the socket with.
+type authFrame struct {
+	Type  string `json:"type"`
+	Token string `json:"token"`
+}
+
+// envelope is the part of a gateway frame that every frame type shares.
+type envelope struct {
+	Type    string `json:"type"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 // handshakeErr maps a rejected handshake onto the errors an HTTP call produces,

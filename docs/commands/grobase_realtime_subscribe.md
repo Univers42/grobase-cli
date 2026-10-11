@@ -16,7 +16,7 @@ grobase realtime subscribe CHANNEL [flags]
 
 ```
       --count int          stop after this many messages (0 = no limit)
-      --event string       only receive this event type
+      --event string       only receive events with this label
   -h, --help               help for subscribe
       --timeout duration   stop after this long (0 = no limit)
 ```

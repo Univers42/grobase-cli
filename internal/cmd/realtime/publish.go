@@ -44,6 +44,8 @@ func newPublishCmd(e *env.Env) *cobra.Command {
 	return cmd
 }
 
+// runPublish opens the socket, broadcasts one message on the channel and closes
+// cleanly.
 func runPublish(ctx context.Context, e *env.Env, channel string, f publishFlags) error {
 	if strings.TrimSpace(f.event) == "" {
 		return exitcode.Usagef("--event is required")
@@ -52,19 +54,24 @@ func runPublish(ctx context.Context, e *env.Env, channel string, f publishFlags)
 	if err != nil {
 		return err
 	}
-	conn, err := dial(ctx, e)
+	conn, err := dial(ctx, e, e.Flags.Timeout)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
-	msg := map[string]any{
-		"type": "broadcast", "channel": channel, "event": f.event,
-		"payload": payload,
-	}
+	msg := broadcastFrame{Type: "BROADCAST", Topic: channel, Event: f.event, Payload: payload}
 	if err := writeJSON(ctx, conn, msg); err != nil {
 		return err
 	}
 	return e.Printer().Print(map[string]any{"channel": channel, "event": f.event})
+}
+
+// broadcastFrame delivers one message to every subscriber of the topic.
+type broadcastFrame struct {
+	Type    string          `json:"type"`
+	Topic   string          `json:"topic"`
+	Event   string          `json:"event"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // payloadOf resolves --data or --data-stdin into the JSON payload to broadcast.
