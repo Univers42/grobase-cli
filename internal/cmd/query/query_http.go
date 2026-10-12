@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 
@@ -99,26 +100,30 @@ func (f crudFlags) payload(e *env.Env) (map[string]any, error) {
 	return payload, nil
 }
 
-// runSQL posts the statement and prints the rows that came back.
+// runSQL posts the statement to the query service's SQL runner and prints the rows that
+// came back. The runner is `POST /query/v1/{db}/sql-ro`, grobase's one raw-SQL route: the
+// execute route has no raw action and refuses an empty resource, so the old
+// `{"action":"raw","resource":""}` body was a 400 Validation Error on every grobase
+// (2026-10-12, the b2b VM; it hid behind the WAF's 403 until rule 10140).
 func runSQL(ctx context.Context, e *env.Env, cl *httpx.Client, f runFlags, mode httpx.Mode) error {
 	sql, err := f.statement(e)
 	if err != nil {
 		return err
 	}
 	req := httpx.Request{
-		Method: "POST", Path: execPath, Mode: mode,
-		JSON: map[string]any{
-			"database_id": f.db,
-			"action":      "raw",
-			"resource":    "",
-			"payload":     map[string]any{"sql": sql},
-		},
+		Method: "POST", Path: sqlPath(f.db), Mode: mode,
+		JSON: map[string]any{"sql": sql},
 	}
 	var out any
 	if err := cl.JSON(ctx, req, &out); err != nil {
 		return httpx.NotEnabled("query run", err)
 	}
 	return printResult(e, out)
+}
+
+// sqlPath is the SQL runner's route for one database.
+func sqlPath(db string) string {
+	return "/query/v1/" + url.PathEscape(db) + "/sql-ro"
 }
 
 // runCrud maps the action, resource, filter and data onto the execute route.

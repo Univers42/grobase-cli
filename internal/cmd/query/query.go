@@ -22,7 +22,7 @@ func New(e *env.Env) *cobra.Command {
 		Use:   "query",
 		Short: "Run SQL and row CRUD against a mounted database",
 		Long: "Talk to the query service of the current context:\n" +
-			"  run      run raw SQL (inline, from a file or from stdin)\n" +
+			"  run      run one read-only SQL statement (inline, from a file or from stdin)\n" +
 			"  crud     select/insert/update/delete rows of a table\n" +
 			"  engines  list the database engines the service supports\n" +
 			"  schema   show the tables and columns of a database",
@@ -37,8 +37,13 @@ func newRunCmd(e *env.Env, mode *string) *cobra.Command {
 	var f runFlags
 	cmd := &cobra.Command{
 		Use:   "run --db ID (--sql 'SELECT 1' | --file FILE | --file -)",
-		Short: "Run raw SQL against a database",
-		Args:  exitcode.Args(cobra.NoArgs),
+		Short: "Run one read-only SQL statement against a database",
+		Long: "Send one statement to the query service's SQL runner (POST /query/v1/{db}/sql-ro).\n" +
+			"The server decides what runs: one read-only statement, on a postgres mount\n" +
+			"that is not owner-scoped, with QUERY_ROUTER_SQL_RO on. Anything else is a\n" +
+			"400 naming the rule, or a bare 404 that never says whether the mount exists.\n" +
+			"Other engines and owner-scoped mounts: `grobase query crud`.",
+		Args: exitcode.Args(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if f.db == "" {
 				return exitcode.Usagef("--db is required")
