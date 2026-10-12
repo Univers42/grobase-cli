@@ -188,6 +188,7 @@ and does not prove your key works (§5 does).
 | `users update <email>` 403 | CLI older than `59d2393` | update, or pass the id from `grobase users get <email>` |
 | `context show` names a URL you did not expect | it prints the first stored URL | `grobase context env b2b` or `doctor` show the one in use |
 | `error obtaining VCS status` / `go.mod requires go >= 1.26.9` when building | container build | `-buildvcs=false`; `golang:1.26.9` |
+| every tailnet route FAILs and `dlesieur42-1` is missing from `tailscale status` | the VM's node key expired (it expires 2027-04-08), or the node was removed: born2root mints its auth keys ephemeral, and Tailscale deletes an ephemeral node some time after it goes offline | on the host, born2root `make tailnet`. The VM may come back with another 100.x address or name: run `scripts/check-routes.sh` and update your context and `.env.grobase-link`. Disabling key expiry for the VM in the admin console removes the first cause |
 
 ## 8. What was run
 
@@ -218,6 +219,7 @@ Tailscale does.
 | B | same node, CLI `2ffd17d` | `magicdns` | FAIL on `tls` (the probe ignored the proxy; fixed in `7cb3ba9`) |
 | C | public internet | `funnel` | PASS, 1118 ms, login + whoami; name resolved to `176.58.90.145` |
 | — | host | `lan-ip`, `tailnet-ip`, `ssh-*` | PASS; `magicdns`, `funnel` FAIL (hide's DNS, §7) |
+| — | host, after the branch merges | every route but `lan-name` (no hosts entry) | PASS, login + whoami; `magicdns` and `funnel` too: the name resolved on `tailscale0` with hide's global mode on |
 
 Not run:
 
@@ -227,19 +229,20 @@ Not run:
 - groot's `make link` from another device. The 2026-10-11 runbook records it
   from the host over the Tailscale IP: `groot/wiki/runbooks/grobase-link.md`.
 - `lan-name` from a device (only `curl --resolve` on the host).
-- MagicDNS on this host after hide's fix: it needs the fix installed (root).
 
 ## 9. groot
 
 groot's frontends reach grobase through a link. On the other device:
 
 ```sh
-git clone --recursive -b feat/grobase-datacenter-link git@github.com:Univers42/groot.git groot && cd groot
+git clone --recursive git@github.com:Univers42/groot.git groot && cd groot
 ```
 
-Do not run plain `make all` on that branch. It fast-forwards the submodules
-and drops the pinned grobase and osionos commits the link needs. Use
-`make all SKIP_SYNC=1`, or only the link targets.
+groot's `main` holds the link. It pins grobase and osionos at their own `main`,
+so the submodule sync in plain `make all` keeps the code the link needs.
+`make all SKIP_SYNC=1` builds exactly the pinned commits; use it to reproduce
+a run. One pin is ahead of its `main`: opposite-osiris (the portal). The sync
+moves it to its `main`, which changes the portal, not the link.
 
 `.env.grobase-link` (git-ignored), one of:
 
