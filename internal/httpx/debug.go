@@ -32,7 +32,7 @@ func (c *Client) traceRequest(req *http.Request, body []byte) {
 	c.tracef("> %s %s", req.Method, c.Redact.String(req.URL.String()))
 	c.traceHeaders(">", req.Header)
 	if len(body) > 0 && isTextual(req.Header.Get("Content-Type")) {
-		c.tracef("> body: %s", c.Redact.String(clip(body)))
+		c.tracef("> body: %s", clip(c.Redact.Bytes(body)))
 	}
 }
 
@@ -50,7 +50,7 @@ func (c *Client) traceResponse(resp *http.Response) {
 	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(b))
 	if err == nil && len(b) > 0 {
-		c.tracef("< body: %s", c.Redact.String(clip(b)))
+		c.tracef("< body: %s", clip(c.Redact.Bytes(b)))
 	}
 }
 
@@ -61,10 +61,12 @@ func (c *Client) traceBytes(resp *http.Response, b []byte) {
 	c.tracef("< %s", resp.Status)
 	c.traceHeaders("<", resp.Header)
 	if len(b) > 0 {
-		c.tracef("< body: %s", c.Redact.String(clip(b)))
+		c.tracef("< body: %s", clip(c.Redact.Bytes(b)))
 	}
 }
 
+// clip bounds a body already redacted: cut first, a JSON body would lose the structure
+// the redactor reads.
 func clip(b []byte) string {
 	if len(b) > maxTraceBody {
 		return string(b[:maxTraceBody]) + "...(truncated)"

@@ -245,7 +245,7 @@ func TestDebugTraceRedactsCredentials(t *testing.T) {
 	const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJl"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"` + jwt + `","key":"mbk_supersecretvalue1"}`))
+		_, _ = w.Write([]byte(`{"access_token":"` + jwt + `","key":"mbk_supersecretvalue1","result":{"rows":[{"service_role_key":"opaque-srk-value"}]}}`))
 	}))
 	defer srv.Close()
 	u, _ := url.Parse(srv.URL)
@@ -258,7 +258,7 @@ func TestDebugTraceRedactsCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	trace := dbg.String()
-	for _, leak := range []string{jwt, "mbk_supersecretvalue1", "hunter2-password", "c2lnbmF0dXJl"} {
+	for _, leak := range []string{jwt, "mbk_supersecretvalue1", "hunter2-password", "c2lnbmF0dXJl", "opaque-srk-value"} {
 		if strings.Contains(trace, leak) {
 			t.Errorf("debug trace leaks %q:\n%s", leak, trace)
 		}
