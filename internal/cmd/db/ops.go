@@ -15,19 +15,27 @@ import (
 func newTestCmd(e *env.Env) *cobra.Command {
 	return &cobra.Command{
 		Use:   "test <id>",
-		Short: "Ask the server to test the connection of one mount",
-		Args:  exitcode.Args(cobra.ExactArgs(1)),
-		RunE:  func(cmd *cobra.Command, args []string) error { return runTest(cmd.Context(), e, args[0]) },
+		Short: "Prove one mount answers: the query service opens it and lists its tables",
+		Long: "Ask the query service for the mount's tables (GET /query/v1/{id}/tables): it\n" +
+			"resolves the mount under the caller's tenant, decrypts its credentials and opens\n" +
+			"the engine, so an answer proves the whole data path. A 404 means the mount does\n" +
+			"not exist for this tenant.",
+		Args: exitcode.Args(cobra.ExactArgs(1)),
+		RunE: func(cmd *cobra.Command, args []string) error { return runTest(cmd.Context(), e, args[0]) },
 	}
 }
 
+// runTest reads the mount's tables. grobase serves no connection-test route: the
+// POST /v1/tenants/me/mounts/{id}/test this command used to send was a 404 on every
+// grobase (b2b data center, 2026-10-12), while the tables listing exercises the same
+// connection through the data plane.
 func runTest(ctx context.Context, e *env.Env, id string) error {
 	cl, _, err := e.Client()
 	if err != nil {
 		return err
 	}
 	var out map[string]any
-	req := httpx.Request{Method: http.MethodPost, Path: mountsPath(id, "test")}
+	req := httpx.Request{Method: http.MethodGet, Path: "/query/v1/" + httpx.Seg(id) + "/tables"}
 	if err := cl.JSON(ctx, req, &out); err != nil {
 		return err
 	}

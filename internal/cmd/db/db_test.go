@@ -145,6 +145,25 @@ func TestDBListReadsBothAnswerShapes(t *testing.T) {
 	}
 }
 
+func TestDBTestReadsTheMountsTablesThroughTheQueryService(t *testing.T) {
+	rec := &recorder{body: `{"engine":"mysql","tables":["projects","tasks"]}`}
+	h := newHarness(t, rec, "")
+	if code := run(t, h, "test", "m1"); code != 0 {
+		t.Fatalf("exit %d: %s", code, h.Err)
+	}
+	if rec.last.Method != http.MethodGet || rec.last.Path != "/query/v1/m1/tables" {
+		t.Fatalf("request = %s %s", rec.last.Method, rec.last.Path)
+	}
+	if !strings.Contains(h.Out.String(), "projects") {
+		t.Fatalf("output = %q", h.Out)
+	}
+
+	missing := &recorder{status: http.StatusNotFound, body: `{"message":"not found"}`}
+	if code := run(t, newHarness(t, missing, ""), "test", "m1"); code == 0 {
+		t.Fatal("a 404 from the query service exited 0")
+	}
+}
+
 func TestDBListTableColumns(t *testing.T) {
 	rec := &recorder{body: `[{"id":"m1","name":"main","engine":"postgresql","isolation":"shared","status":"ready"}]`}
 	h := customHarness(t, rec, "table", func(string) string { return "" }, "")

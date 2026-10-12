@@ -1,6 +1,13 @@
 ## grobase db test
 
-Ask the server to test the connection of one mount
+Prove one mount answers: the query service opens it and lists its tables
+
+### Synopsis
+
+Ask the query service for the mount's tables (GET /query/v1/{id}/tables): it
+resolves the mount under the caller's tenant, decrypts its credentials and opens
+the engine, so an answer proves the whole data path. A 404 means the mount does
+not exist for this tenant.
 
 ```
 grobase db test <id> [flags]
