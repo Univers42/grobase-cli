@@ -26,6 +26,9 @@ grobase api /v1/tenants/me
 
 Secrets are never flag values: they come from a prompt, stdin or an environment variable.
 
+Connecting from another device (LAN, wifi, Tailscale, Funnel, ssh tunnel) with
+one context and a pinned certificate: [docs/CONNECTING.md](docs/CONNECTING.md).
+
 ## Contexts
 
 One deployment is reachable under several URLs depending on the network. A context holds all of them and uses the first that answers:
