@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -102,23 +103,48 @@ type CertInfo struct {
 }
 
 // Probe connects to host:port and reports the leaf certificate without trusting it.
+// It goes through the proxy the environment names (HTTPS_PROXY, NO_PROXY), as every
+// request does: Tailscale in userspace mode (a machine without root) reaches the
+// tailnet only through its SOCKS5/HTTP proxy, and the old direct dial failed doctor's
+// TLS row there while the requests themselves worked.
 // Ponytail: Verified is checked against the system roots only; a CA given by
 // --ca-file is not consulted, so a CA-signed server may report Verified=false here
 // even though a real request with that CA would succeed.
 func Probe(ctx context.Context, hostport string) (CertInfo, error) {
-	d := tls.Dialer{Config: &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true}} //nolint:gosec // SECURITY.md#tls: probing the cert only to show it to the user, nothing is sent
-	conn, err := d.DialContext(ctx, "tcp", hostport)
+	return probeVia(ctx, hostport, http.ProxyFromEnvironment)
+}
+
+// errCaptured aborts the probe's handshake once the certificate is in hand, so no
+// request ever reaches the server.
+var errCaptured = errors.New("certificate captured")
+
+func probeVia(ctx context.Context, hostport string, proxy func(*http.Request) (*url.URL, error)) (CertInfo, error) {
+	var state tls.ConnectionState
+	tr := &http.Transport{
+		Proxy: proxy,
+		TLSClientConfig: &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true, //nolint:gosec // SECURITY.md#tls: probing the cert only to show it to the user, nothing is sent
+			VerifyConnection: func(cs tls.ConnectionState) error {
+				state = cs
+				return errCaptured
+			},
+		},
+	}
+	defer tr.CloseIdleConnections()
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, "https://"+hostport+"/", nil)
 	if err != nil {
-		return CertInfo{}, fmt.Errorf("connect %s: %w", hostport, err)
+		return CertInfo{}, err
 	}
-	defer func() { _ = conn.Close() }()
-	tc, ok := conn.(*tls.Conn)
-	if !ok {
-		return CertInfo{}, errors.New("unexpected connection type")
+	resp, err := tr.RoundTrip(req)
+	if resp != nil {
+		_ = resp.Body.Close()
 	}
-	state := tc.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
-		return CertInfo{}, errors.New("server presented no certificate")
+		if err == nil {
+			err = errors.New("server presented no certificate")
+		}
+		return CertInfo{}, fmt.Errorf("connect %s: %w", hostport, err)
 	}
 	leaf := state.PeerCertificates[0]
 	sum := sha256.Sum256(leaf.Raw)
