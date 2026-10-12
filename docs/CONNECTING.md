@@ -38,6 +38,14 @@ reach the VM directly, not through the host. Tailnet: `tail10f2ea.ts.net`.
 Funnel publishes the WAF to the whole internet. The pin does not apply to it:
 its certificate is a public one, so the CLI trusts it through the system roots.
 
+Funnel carries the user plane only. It reaches the WAF from the VM's loopback,
+which Kong's allow list on its private routes admits, so the WAF itself
+refuses `/admin/v1`, `/meta/v1` and `/realtime/v1/publish` to every request
+Funnel delivers (grobase rule 10130, `1aaac82e`, 2026-10-12). Over `funnel`,
+`login`, `whoami`, `doctor`, `api` on the data routes and realtime
+subscriptions work. `db migrate`, `functions` and the other service-role admin
+commands answer 403 there; run them over the tailnet, the LAN or ssh.
+
 ## 3. On the other device: Tailscale
 
 Skip this for the LAN-only and Funnel routes.
@@ -218,6 +226,7 @@ Tailscale does.
 | B | tailnet node over DERP | ssh | key login, `ssh ok: dlesieur42 dlesieur` |
 | B | same node, CLI `2ffd17d` | `magicdns` | FAIL on `tls` (the probe ignored the proxy; fixed in `7cb3ba9`) |
 | C | public internet | `funnel` | PASS, 1118 ms, login + whoami; name resolved to `176.58.90.145` |
+| C | same, after WAF rule 10130 | `funnel` + private paths | PASS, 289 ms, login + whoami; `/admin/v1/tenants`, `/admin/v1/keys`, `/meta/v1/tables`, `/realtime/v1/publish` 403 (rule 10130 in the WAF audit log), `/auth/v1/health` 401 from Kong |
 | — | host | `lan-ip`, `tailnet-ip`, `ssh-*` | PASS; `magicdns`, `funnel` FAIL (hide's DNS, §7) |
 | — | host, after the branch merges | every route but `lan-name` (no hosts entry) | PASS, login + whoami; `magicdns` and `funnel` too: the name resolved on `tailscale0` with hide's global mode on |
 
