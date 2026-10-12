@@ -34,10 +34,11 @@ func TestHeader(t *testing.T) {
 	h := http.Header{}
 	h.Set("Authorization", "Bearer "+jwtSample)
 	h.Set("apikey", jwtSample)
+	h.Set("X-Baas-Api-Key", "opaque-app-key")
 	h.Set("X-Note", "token "+mbkSample)
 	h.Set("Content-Type", "application/json")
 	out := r.Header(h)
-	for _, name := range []string{"Authorization", "Apikey"} {
+	for _, name := range []string{"Authorization", "Apikey", "X-Baas-Api-Key"} {
 		if out.Get(name) != Mask {
 			t.Errorf("%s = %q", name, out.Get(name))
 		}

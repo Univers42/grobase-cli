@@ -91,6 +91,15 @@ func TestAuthorizeHeadersPerMode(t *testing.T) {
 		if err != nil || h.Get("apikey") != tc.apikey || h.Get("Authorization") != tc.bearer {
 			t.Errorf("mode %v: apikey=%q auth=%q err=%v", tc.mode, h.Get("apikey"), h.Get("Authorization"), err)
 		}
+		// The query service reads the app key only from X-Baas-Api-Key; no other
+		// credential may ever be sent under that name.
+		wantDataPlane := ""
+		if tc.mode == httpx.ModeAPIKey {
+			wantDataPlane = "mbk_abcdef123"
+		}
+		if got := h.Get("X-Baas-Api-Key"); got != wantDataPlane {
+			t.Errorf("mode %v: X-Baas-Api-Key=%q, want %q", tc.mode, got, wantDataPlane)
+		}
 	}
 }
 

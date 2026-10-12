@@ -172,7 +172,7 @@ func sensitiveKey(k string) bool {
 
 func sensitiveHeader(name string) bool {
 	switch http.CanonicalHeaderKey(name) {
-	case "Authorization", "Apikey", "Cookie", "Set-Cookie", "Proxy-Authorization", "X-Api-Key":
+	case "Authorization", "Apikey", "Cookie", "Set-Cookie", "Proxy-Authorization", "X-Api-Key", "X-Baas-Api-Key":
 		return true
 	}
 	return false
