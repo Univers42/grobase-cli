@@ -137,8 +137,5 @@ func userByEmail(ctx context.Context, cl *httpx.Client, email string) (map[strin
 	return nil, notFound("no user with email " + email)
 }
 
-// notFound builds the same error shape the client returns for a 404, so the exit code
-// (4) and the wording stay in one place.
-func notFound(msg string) error {
-	return &httpx.APIError{Method: http.MethodGet, Path: adminUsersPath, Status: http.StatusNotFound, Message: msg}
-}
+// notFound is a lookup this command made that found nothing: exit code 4.
+func notFound(msg string) error { return exitcode.NotFoundf("%s", msg) }

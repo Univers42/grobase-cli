@@ -12,6 +12,7 @@ import (
 	"github.com/Univers42/grobase-cli/internal/cmd/db"
 	"github.com/Univers42/grobase-cli/internal/cmd/doctor"
 	"github.com/Univers42/grobase-cli/internal/cmd/functions"
+	"github.com/Univers42/grobase-cli/internal/cmd/host"
 	"github.com/Univers42/grobase-cli/internal/cmd/keys"
 	"github.com/Univers42/grobase-cli/internal/cmd/orgs"
 	"github.com/Univers42/grobase-cli/internal/cmd/query"
@@ -54,7 +55,7 @@ func NewRoot(deps env.Deps, info BuildInfo) (*cobra.Command, *env.Env) {
 		newContextCmd(e), newLoginCmd(e), newSignupCmd(e), newLogoutCmd(e), newWhoamiCmd(e), newTokenCmd(e),
 		newVersionCmd(e, info), newDocsCmd(root),
 		users.New(e), keys.New(e), apps.New(e), tenants.New(e), db.New(e), orgs.New(e), query.New(e),
-		apicmd.New(e), storage.New(e), realtime.New(e), functions.New(e), status.New(e), doctor.New(e),
+		apicmd.New(e), storage.New(e), realtime.New(e), functions.New(e), status.New(e), doctor.New(e), host.New(e),
 	)
 	return root, e
 }

@@ -24,6 +24,7 @@ func newContextCmd(e *env.Env) *cobra.Command {
 type addFlags struct {
 	urls          []string
 	caFile, pin   string
+	ssh           string
 	insecure, yes bool
 }
 
@@ -43,6 +44,7 @@ func newContextAdd(e *env.Env) *cobra.Command {
 	cmd.Flags().StringVar(&f.pin, "pin-sha256", "", "pin the server leaf certificate (hex SHA-256 of its DER)")
 	cmd.Flags().BoolVar(&f.insecure, "insecure-skip-verify", false, "DANGEROUS: do not verify the server certificate at all")
 	cmd.Flags().BoolVar(&f.yes, "yes", false, "accept the presented certificate fingerprint without asking")
+	cmd.Flags().StringVar(&f.ssh, "ssh", "", "ssh destination of the machine running grobase, for `grobase host` (alias or user@host)")
 	_ = cmd.MarkFlagRequired("url")
 	return cmd
 }
@@ -66,7 +68,7 @@ func runContextAdd(cmd *cobra.Command, e *env.Env, name string, f addFlags) erro
 	if len(urls) == 0 {
 		return &exitcode.UsageError{Msg: "missing required --url"}
 	}
-	c := config.Context{Name: name, URL: urls[0], CAFile: f.caFile, PinSHA256: f.pin, Insecure: f.insecure}
+	c := config.Context{Name: name, URL: urls[0], CAFile: f.caFile, PinSHA256: f.pin, Insecure: f.insecure, SSH: f.ssh}
 	if len(urls) > 1 {
 		c.Alternates = urls[1:]
 	}
@@ -109,9 +111,9 @@ func newContextList(e *env.Env) *cobra.Command {
 			rows := make([]map[string]any, 0, len(cf.Contexts))
 			for _, n := range cf.Names() {
 				c := cf.Contexts[n]
-				rows = append(rows, map[string]any{"name": n, "current": n == cf.Current, "url": c.URL, "tls": tlsMode(c)})
+				rows = append(rows, map[string]any{"name": n, "current": n == cf.Current, "url": c.URL, "tls": tlsMode(c), "ssh": c.SSH})
 			}
-			return e.Printer().Print(rows, "name", "current", "url", "tls")
+			return e.Printer().Print(rows, "name", "current", "url", "tls", "ssh")
 		},
 	}
 }

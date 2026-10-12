@@ -177,8 +177,9 @@ func printBody(ctx context.Context, e *env.Env, cl *httpx.Client, req httpx.Requ
 	return err
 }
 
-// Ponytail: a 404 here cannot tell a missing function from a deployment without the
-// logs route; both read "not enabled". Check `functions list` to tell them apart.
+// Caveat: when the gateway has a logs route, a 404 cannot tell a missing function from a
+// runtime without logs; both read "not enabled" (a missing gateway route reads "not
+// deployed"). Check `functions list` to tell them apart.
 func newLogsCmd(e *env.Env) *cobra.Command {
 	var tail int
 	cmd := &cobra.Command{

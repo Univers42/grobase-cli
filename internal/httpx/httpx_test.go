@@ -191,11 +191,61 @@ func TestAPIErrorMapping(t *testing.T) {
 	}
 }
 
+// The bodies are the ones the baas VM answered on 2026-10-12: Kong for /nonexistent-zz/v1/x,
+// tenant-control (TENANT_SELFSERVE_ENABLED off) for /v1/tenants/me/mounts.
+func TestMissTellsWhoAnswered404(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       httpx.Miss
+		state      string
+		prefix     string
+	}{
+		{
+			"kong no route", `{"message":"no Route matched with those values","request_id":"0f3c"}`,
+			httpx.MissNoRoute, "not deployed", "mounts: not deployed on this gateway: ",
+		},
+		{"go mux, feature off", "404 page not found\n", httpx.MissNoHandler, "switched off", "mounts: switched off on this deployment: "},
+		{
+			"express", `<!DOCTYPE html><html><body><pre>Cannot GET /x</pre></body></html>`,
+			httpx.MissNoHandler, "switched off", "mounts: switched off on this deployment: ",
+		},
+		{
+			"nestjs", `{"message":"Cannot GET /x","error":"Not Found","statusCode":404}`,
+			httpx.MissNoHandler, "switched off", "mounts: switched off on this deployment: ",
+		},
+		{"a handler's json", `{"msg":"User not found"}`, httpx.MissUnknown, "not enabled", "mounts: not enabled on this deployment: "},
+		{"empty", ``, httpx.MissUnknown, "not enabled", "mounts: not enabled on this deployment: "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+			u, _ := url.Parse(srv.URL)
+			err := get(&httpx.Client{Base: u, HTTP: srv.Client(), Redact: redact.New()})
+			var api *httpx.APIError
+			if !errors.As(err, &api) {
+				t.Fatalf("not an APIError: %v", err)
+			}
+			if api.Miss() != tc.want || api.Miss().FeatureState() != tc.state {
+				t.Errorf("Miss = %d (%s), want %d (%s)", api.Miss(), api.Miss().FeatureState(), tc.want, tc.state)
+			}
+			if got := httpx.NotEnabled("mounts", err).Error(); !strings.HasPrefix(got, tc.prefix) {
+				t.Errorf("NotEnabled = %q, want prefix %q", got, tc.prefix)
+			}
+		})
+	}
+	if (&httpx.APIError{Status: 500, Message: "no Route matched with those values"}).Miss() != httpx.MissUnknown {
+		t.Error("a non-404 must never be classified")
+	}
+}
+
 func TestDebugTraceRedactsCredentials(t *testing.T) {
 	const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJl"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"` + jwt + `","key":"mbk_supersecretvalue1"}`))
+		_, _ = w.Write([]byte(`{"access_token":"` + jwt + `","key":"mbk_supersecretvalue1","result":{"rows":[{"service_role_key":"opaque-srk-value"}]}}`))
 	}))
 	defer srv.Close()
 	u, _ := url.Parse(srv.URL)
@@ -208,7 +258,7 @@ func TestDebugTraceRedactsCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	trace := dbg.String()
-	for _, leak := range []string{jwt, "mbk_supersecretvalue1", "hunter2-password", "c2lnbmF0dXJl"} {
+	for _, leak := range []string{jwt, "mbk_supersecretvalue1", "hunter2-password", "c2lnbmF0dXJl", "opaque-srk-value"} {
 		if strings.Contains(trace, leak) {
 			t.Errorf("debug trace leaks %q:\n%s", leak, trace)
 		}

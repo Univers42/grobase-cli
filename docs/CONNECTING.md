@@ -261,3 +261,48 @@ openssl x509 -noout -fingerprint -sha256 -in ~/grobase-ca.pem
 ssh -p 4242 dlesieur@100.94.119.97 openssl x509 -noout -fingerprint -sha256 \
     -in /opt/grobase/certs/track-binocle-local-ca.pem
 ```
+
+## 10. Migrations and the host, from the other device
+
+Both need a CLI built with `db migrate` and `host`, and the VM's grobase at
+`9f26e792` or later (data plane token `8fa693d2`, WAF rule 10120). Use the throwaway admin
+config from §4 step 5, with `--ssh` added to the context:
+
+```sh
+grobase context add adm --url https://100.94.119.97:8443 --yes --ssh b2b \
+    --pin-sha256 28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a
+grobase db list --tenant agency --credential-store file           # 7 mounts on 2026-10-12
+grobase db migrate --tenant agency --mount pg-commerce ./migrations --credential-store file
+```
+
+`./migrations` holds `0001_create.sql`, `0002_seed.sql`, ...; each file is one
+migration, sent whole. The second run of the same directory prints `skipped`
+for every file. A changed file needs a new name: the server keys on the name.
+
+`b2b` is an `~/.ssh/config` alias for the VM (§5). Then:
+
+```sh
+grobase host ps                  # every container of the mini-baas project
+grobase host health              # exit 1 names each unhealthy / crash-looping / failed one
+grobase host logs waf --since 10m --tail 100
+grobase host restart mailpit     # asks; --yes to skip
+```
+
+Measured on 2026-10-12 against the baas VM, from this host over the tailnet IP:
+
+| Step | Result |
+|---|---|
+| `db migrate` pg-commerce, run 1 / run 2 | `applied` ×2 / `skipped` ×2, exit 0 |
+| `db migrate` mysql-ops, run 1 / run 2 | `applied` ×2 / `skipped` ×2, exit 0 |
+| rows written (`it's here; -- not a comment`, `<b>bold</b> ../../etc/passwd`) | identical in Postgres `commerce` and MySQL `ops` |
+| a file with a syntax error after them | `400 … syntax error at or near "CREAT"`, exit 1, no marker left |
+| a MongoDB mount | `422 engine 'mongodb' does not support requested capability 'ddl'`, exit 1 |
+| `--mount pg-comerce` (typo) | exit 4, lists the tenant's 7 mounts |
+| `db list` without `--tenant` | `switched off on this deployment` (TENANT_SELFSERVE_ENABLED is off) |
+| `--debug` migrate trace | 0 copies of the service-role key, 8 masks |
+| `host health` | `40 containers of mini-baas: none unhealthy, crash-looping or failed` |
+| `host logs waf` | the raw log held the service-role key on 28 lines; the CLI printed it on 0 |
+| `host restart mailpit` without a terminal / with `--yes` | exit 2 `pass --yes to confirm` / restarted, healthy 6 s later |
+
+The test tables were dropped afterwards by one more migration
+(`20261012_grobase_cli_live_test_cleanup`), whose marker is the only trace left.

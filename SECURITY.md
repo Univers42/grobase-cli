@@ -29,8 +29,12 @@ Passwords, keys and connection strings are read from a prompt, `--*-stdin`, or a
 
 ## Redaction
 
-Every output path (`--debug` trace, errors, command output) goes through `internal/redact`: JWTs, `mbk_` keys, registered secret values, sensitive JSON fields and sensitive headers (`Authorization`, `apikey`, cookies) are masked. Tests: `internal/httpx` and `internal/cli` debug tests assert no credential reaches the trace.
-Limit (Ponytail): detection is pattern-based. A secret in an unrecognised shape that was never registered is not masked. `token print` deliberately prints a credential; that is its purpose.
+Every output path (`--debug` trace, errors, `host logs`) goes through `internal/redact`, in three layers: every secret value the CLI loaded or read, exactly; in a JSON document, every value under a key that names a credential (`token`, `secret`, `password`, `credential`, `authorization`, `cookie`, `signature`, a name ending in `key` or `dsn`, ...) at any depth and whatever its shape, including a JSON document quoted inside a string; then free-text shapes (JWTs, `mbk_` keys, URL passwords, `Bearer` tokens, PEM private keys). Sensitive headers (`Authorization`, `apikey`, cookies) are masked whole. A trace is redacted before it is clipped, so a long JSON body keeps its structure. Tests: `internal/redact`, `internal/httpx` and `internal/cmd/host`. Measured on the baas VM (2026-10-12): the WAF's audit log held the service-role key on 28 lines; `grobase host logs waf` printed it on 0, with 41 masks.
+Caveat: a secret the CLI never held, under an innocuous key (`{"value":"..."}`) or in non-JSON text in no recognised shape, is not masked; over-masking (`credential_ref`, `token_type`) is the chosen failure. `token print` deliberately prints a credential; that is its purpose.
+
+## Host access
+
+`grobase host` runs `ssh -o BatchMode=yes -o ConnectTimeout=10 -- DEST 'docker ...'`. The destination must pass `config.ValidSSHTarget` (no leading `-`, so `-oProxyCommand=...` cannot become an ssh option; no spaces or shell syntax), and the remote command line is built from fixed words plus values checked against closed character sets (`--project`, service names, `--since`, `--tail`). A service name is also matched against the stack's own container list before anything but the listing runs. `restart` asks for confirmation unless `--yes`.
 
 ## TLS
 

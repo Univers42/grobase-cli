@@ -17,7 +17,9 @@ func New(e *env.Env) *cobra.Command {
 		Use:   "status",
 		Short: "Probe every endpoint of the current context and report its state",
 		Long: "GET each endpoint of the current context, concurrently, and report whether it answers.\n" +
-			"State is ok (the route answered), not enabled (404) or down (5xx or no connection).\n" +
+			"State is ok (the route answered), down (5xx or no connection), or what a 404 says:\n" +
+			"not deployed (the gateway has no route), switched off (the service behind the route\n" +
+			"has no handler) or not enabled (a bare 404 that names neither).\n" +
 			"Exit code is 1 only when the context URL itself is unreachable; the probes send\n" +
 			"no credential, so status works before any `grobase login`.",
 		Args: exitcode.Args(cobra.NoArgs),

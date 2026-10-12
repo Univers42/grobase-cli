@@ -21,7 +21,7 @@ func New(e *env.Env) *cobra.Command {
 		Short: "Manage the database mounts of the current tenant",
 		Args:  exitcode.Args(cobra.NoArgs),
 	}
-	c.AddCommand(newListCmd(e), newAddCmd(e), newTestCmd(e), newRemoveCmd(e))
+	c.AddCommand(newListCmd(e), newAddCmd(e), newTestCmd(e), newRemoveCmd(e), newMigrateCmd(e))
 	return c
 }
 

@@ -3,7 +3,7 @@
 Sign a user out of every device
 
 ```
-grobase users sessions revoke <id> [flags]
+grobase users sessions revoke <id|email> [flags]
 ```
 
 ### Options

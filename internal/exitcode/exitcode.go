@@ -29,9 +29,20 @@ type UsageError struct{ Msg string }
 // Error implements error.
 func (e *UsageError) Error() string { return e.Msg }
 
+// NotFoundError is a lookup the CLI made itself that found nothing (exit code NotFound),
+// as opposed to a 404 the server answered.
+type NotFoundError struct{ Msg string }
+
+// Error implements error.
+func (e *NotFoundError) Error() string { return e.Msg }
+
+// NotFoundf returns a NotFoundError.
+func NotFoundf(format string, a ...any) error { return &NotFoundError{Msg: fmt.Sprintf(format, a...)} }
+
 // Of returns the exit code for err.
 func Of(err error) int {
 	var ue *UsageError
+	var nf *NotFoundError
 	var ae *httpx.APIError
 	switch {
 	case err == nil:
@@ -42,7 +53,7 @@ func Of(err error) int {
 		return AuthFail
 	case errors.As(err, &ae) && ae.Unauthorized():
 		return AuthFail
-	case errors.As(err, &ae) && ae.NotFound(), errors.Is(err, fs.ErrNotExist), errors.Is(err, config.ErrNoContext):
+	case errors.As(err, &nf), errors.As(err, &ae) && ae.NotFound(), errors.Is(err, fs.ErrNotExist), errors.Is(err, config.ErrNoContext):
 		return NotFound
 	}
 	return Failure

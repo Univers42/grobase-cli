@@ -26,6 +26,9 @@ type Context struct {
 	PinSHA256 string `json:"pin_sha256,omitempty"`
 	// Insecure disables certificate verification entirely.
 	Insecure bool `json:"insecure,omitempty"`
+	// SSH is the ssh destination (an ~/.ssh/config alias, host or user@host) of the
+	// machine that runs grobase's containers, used by `grobase host`. Optional.
+	SSH string `json:"ssh,omitempty"`
 }
 
 // File is the on-disk document.
@@ -96,7 +99,25 @@ func (c Context) Validate() error {
 	if c.PinSHA256 != "" && !validPin(c.PinSHA256) {
 		return errors.New("pin_sha256 must be 64 lowercase hex characters")
 	}
+	if c.SSH != "" && !ValidSSHTarget(c.SSH) {
+		return fmt.Errorf("invalid ssh destination %q: an alias, host or user@host, not starting with '-'", c.SSH)
+	}
 	return nil
+}
+
+// ValidSSHTarget accepts an ssh destination (alias, host, user@host, [v6]:port,
+// ssh://user@host:port) and refuses what ssh would read as an option (a leading '-',
+// e.g. -oProxyCommand=...) or anything holding a space or shell syntax.
+func ValidSSHTarget(s string) bool {
+	if s == "" || len(s) > 255 || s[0] == '-' {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; !isAlnum(c) && !strings.ContainsRune("_.@:[]%+/-", rune(c)) {
+			return false
+		}
+	}
+	return true
 }
 
 // Add inserts or replaces a context; the first one added becomes current.

@@ -60,3 +60,20 @@ func TestAddTrimsTrailingSlashAlternates(t *testing.T) {
 		t.Fatalf("url = %q want https://a.example", got.URL)
 	}
 }
+
+// `grobase host` hands this string to ssh as its destination: a leading '-' would make
+// it an option (-oProxyCommand=... runs a local command), a space or ';' shell syntax.
+func TestValidSSHTarget(t *testing.T) {
+	for s, want := range map[string]bool{
+		"b2b": true, "dlesieur@100.94.119.97": true, "ssh://dlesieur@host:4242": true, "[fe80::1%eth0]": true,
+		"": false, "-oProxyCommand=touch /tmp/x": false, "-p": false, "b2b; id": false, "b2b id": false,
+		"host$(id)": false, "a`id`": false, "x\nid": false, strings.Repeat("a", 256): false,
+	} {
+		if config.ValidSSHTarget(s) != want {
+			t.Errorf("ValidSSHTarget(%q) = %v, want %v", s, !want, want)
+		}
+	}
+	if err := (config.Context{Name: "x", URL: "https://h:8443", SSH: "-oProxyCommand=x"}).Validate(); err == nil {
+		t.Error("a context must refuse an ssh destination that ssh would read as an option")
+	}
+}

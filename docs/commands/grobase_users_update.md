@@ -3,7 +3,7 @@
 Change the email, role, password or metadata of a user
 
 ```
-grobase users update <id> [flags]
+grobase users update <id|email> [flags]
 ```
 
 ### Options

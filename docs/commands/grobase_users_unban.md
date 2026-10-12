@@ -3,7 +3,7 @@
 Lift the ban of a user
 
 ```
-grobase users unban <id> [flags]
+grobase users unban <id|email> [flags]
 ```
 
 ### Options
