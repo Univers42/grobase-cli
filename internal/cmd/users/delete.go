@@ -15,7 +15,7 @@ import (
 func newDeleteCmd(e *env.Env) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "delete <id>",
+		Use:   "delete <id|email>",
 		Short: "Delete a user permanently",
 		Args:  exitcode.Args(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -33,6 +33,9 @@ func runDelete(ctx context.Context, e *env.Env, id string, yes bool) error {
 	}
 	cl, err := serviceClient(e)
 	if err != nil {
+		return err
+	}
+	if id, err = userID(ctx, cl, id); err != nil {
 		return err
 	}
 	var u map[string]any

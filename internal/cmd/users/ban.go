@@ -18,7 +18,7 @@ const defaultBanDuration = "876000h"
 func newBanCmd(e *env.Env) *cobra.Command {
 	var duration string
 	cmd := &cobra.Command{
-		Use:   "ban <id>",
+		Use:   "ban <id|email>",
 		Short: "Ban a user",
 		Args:  exitcode.Args(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -38,7 +38,7 @@ func runBan(ctx context.Context, e *env.Env, id, duration string) error {
 
 func newUnbanCmd(e *env.Env) *cobra.Command {
 	return &cobra.Command{
-		Use:   "unban <id>",
+		Use:   "unban <id|email>",
 		Short: "Lift the ban of a user",
 		Args:  exitcode.Args(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -50,6 +50,9 @@ func newUnbanCmd(e *env.Env) *cobra.Command {
 func setBan(ctx context.Context, e *env.Env, id, banDuration string) error {
 	cl, err := serviceClient(e)
 	if err != nil {
+		return err
+	}
+	if id, err = userID(ctx, cl, id); err != nil {
 		return err
 	}
 	r := adminReq(http.MethodPut, adminUsersPath+"/"+httpx.Seg(id))

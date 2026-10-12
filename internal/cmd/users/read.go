@@ -95,6 +95,25 @@ func fetchUser(ctx context.Context, cl *httpx.Client, idOrEmail string) (map[str
 	return userByID(ctx, cl, idOrEmail)
 }
 
+// userID turns an id-or-email argument into the id the admin write paths need.
+// An email sent as-is lands in the URL path, where the b2b WAF answered 403
+// rather than GoTrue's 404 (2026-10-12), so the user saw a firewall refusal for
+// a typo-free command.
+func userID(ctx context.Context, cl *httpx.Client, idOrEmail string) (string, error) {
+	if !strings.Contains(idOrEmail, "@") {
+		return idOrEmail, nil
+	}
+	u, err := userByEmail(ctx, cl, idOrEmail)
+	if err != nil {
+		return "", err
+	}
+	id, _ := u["id"].(string)
+	if id == "" {
+		return "", notFound("user " + idOrEmail + " carries no id")
+	}
+	return id, nil
+}
+
 func userByID(ctx context.Context, cl *httpx.Client, id string) (map[string]any, error) {
 	var u map[string]any
 	err := cl.JSON(ctx, adminReq(http.MethodGet, adminUsersPath+"/"+httpx.Seg(id)), &u)

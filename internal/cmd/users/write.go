@@ -108,7 +108,7 @@ type updateFlags struct {
 func newUpdateCmd(e *env.Env) *cobra.Command {
 	var f updateFlags
 	cmd := &cobra.Command{
-		Use:   "update <id>",
+		Use:   "update <id|email>",
 		Short: "Change the email, role, password or metadata of a user",
 		Args:  exitcode.Args(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -150,6 +150,9 @@ func runUpdate(ctx context.Context, e *env.Env, cmd *cobra.Command, id string, f
 	}
 	cl, err := serviceClient(e)
 	if err != nil {
+		return err
+	}
+	if id, err = userID(ctx, cl, id); err != nil {
 		return err
 	}
 	r := adminReq("PUT", adminUsersPath+"/"+httpx.Seg(id))

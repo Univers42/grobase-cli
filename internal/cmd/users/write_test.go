@@ -173,6 +173,24 @@ func TestUpdateUserRejectsWeakPasswordBeforeAnyRequest(t *testing.T) {
 	}
 }
 
+func TestUpdateUserByEmailResolvesTheID(t *testing.T) {
+	h, f := newWorld(t, "", answerEvery(200, `{"users":[`+userJSON+`],"total":1}`))
+	mustRun(t, h, "update", "a@b.c", "--role", "editor")
+	if c := f.last(t); c.method != http.MethodPut || c.path != "/auth/v1/admin/users/u1" {
+		t.Errorf("request = %s %s, want PUT on the resolved id", c.method, c.path)
+	}
+}
+
+func TestUpdateUserUnknownEmailSendsNoWrite(t *testing.T) {
+	h, f := newWorld(t, "", answerEvery(200, `{"users":[],"total":0}`))
+	if got := exitCode(t, h, "update", "nobody@b.c", "--role", "editor"); got != exitcode.NotFound {
+		t.Errorf("exit %d, want 4", got)
+	}
+	if c := f.last(t); c.method != http.MethodGet {
+		t.Errorf("last request = %s %s, want only the lookup", c.method, c.path)
+	}
+}
+
 func TestUpdateUserEscapesTheID(t *testing.T) {
 	h, f := world(t)
 	mustRun(t, h, "update", "u/1", "--role", "editor")
