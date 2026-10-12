@@ -91,7 +91,7 @@ func argsWith(t *testing.T, args ...string) []string {
 }
 
 func TestQueryRunRequestBodyShape(t *testing.T) {
-	want := `{"action":"raw","database_id":"db1","payload":{"sql":"select 1"},"resource":""}`
+	want := `{"sql":"select 1"}`
 	for _, tc := range []struct {
 		name, stdin string
 		args        []string
@@ -102,7 +102,7 @@ func TestQueryRunRequestBodyShape(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var c captured
-			c.wantMethod, c.wantPath, c.wantBody, c.wantAuth = "POST", execPath, want, true
+			c.wantMethod, c.wantPath, c.wantBody, c.wantAuth = "POST", "/query/v1/db1/sql-ro", want, true
 			_, err := run(t, recordingHandler(`{"rows":[{"one":1}]}`, &c), tc.stdin, argsWith(t, tc.args...)...)
 			if err != nil {
 				t.Fatalf("exit %d: %v", exitcode.Of(err), err)

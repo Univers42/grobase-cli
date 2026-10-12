@@ -1,6 +1,14 @@
 ## grobase query run
 
-Run raw SQL against a database
+Run one read-only SQL statement against a database
+
+### Synopsis
+
+Send one statement to the query service's SQL runner (POST /query/v1/{db}/sql-ro).
+The server decides what runs: one read-only statement, on a postgres mount
+that is not owner-scoped, with QUERY_ROUTER_SQL_RO on. Anything else is a
+400 naming the rule, or a bare 404 that never says whether the mount exists.
+Other engines and owner-scoped mounts: `grobase query crud`.
 
 ```
 grobase query run --db ID (--sql 'SELECT 1' | --file FILE | --file -) [flags]

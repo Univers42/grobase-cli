@@ -5,7 +5,7 @@ Run SQL and row CRUD against a mounted database
 ### Synopsis
 
 Talk to the query service of the current context:
-  run      run raw SQL (inline, from a file or from stdin)
+  run      run one read-only SQL statement (inline, from a file or from stdin)
   crud     select/insert/update/delete rows of a table
   engines  list the database engines the service supports
   schema   show the tables and columns of a database
@@ -33,6 +33,6 @@ Talk to the query service of the current context:
 * [grobase](grobase.md)	 - Remote controller for a self-hosted grobase platform
 * [grobase query crud](grobase_query_crud.md)	 - Select, insert, update or delete rows of a table
 * [grobase query engines](grobase_query_engines.md)	 - List the database engines the query service supports
-* [grobase query run](grobase_query_run.md)	 - Run raw SQL against a database
+* [grobase query run](grobase_query_run.md)	 - Run one read-only SQL statement against a database
 * [grobase query schema](grobase_query_schema.md)	 - Show the tables and columns of a database
 
