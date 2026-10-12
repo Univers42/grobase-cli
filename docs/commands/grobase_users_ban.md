@@ -3,7 +3,7 @@
 Ban a user
 
 ```
-grobase users ban <id> [flags]
+grobase users ban <id|email> [flags]
 ```
 
 ### Options

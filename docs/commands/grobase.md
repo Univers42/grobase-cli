@@ -30,6 +30,7 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 authentication/authorization, 4 not found 
 * [grobase db](grobase_db.md)	 - Manage the database mounts of the current tenant
 * [grobase doctor](grobase_doctor.md)	 - Check the current context: config, connectivity, TLS, clock, credentials, auth and features
 * [grobase functions](grobase_functions.md)	 - List, deploy, invoke and read the logs of edge functions
+* [grobase host](grobase_host.md)	 - Inspect and restart the containers of the machine running grobase (over ssh)
 * [grobase keys](grobase_keys.md)	 - Manage the current tenant's API keys
 * [grobase login](grobase_login.md)	 - Authenticate against the current context and store the credential encrypted
 * [grobase logout](grobase_logout.md)	 - Forget the session (and with --all every stored key) of the current context

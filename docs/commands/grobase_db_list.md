@@ -1,6 +1,12 @@
 ## grobase db list
 
-List the database mounts of the current tenant
+List the database mounts of the current tenant, or of --tenant with the service-role key
+
+### Synopsis
+
+Without --tenant, the mounts of the tenant the credential belongs to (tenant
+self-service, /v1/tenants/me/mounts). With --tenant, any tenant's mounts through the
+service-role admin route, which also works where self-service is switched off.
 
 ```
 grobase db list [flags]
@@ -9,7 +15,8 @@ grobase db list [flags]
 ### Options
 
 ```
-  -h, --help   help for list
+  -h, --help                                  help for list
+      --tenant grobase login --service-role   tenant whose mounts to list (needs grobase login --service-role)
 ```
 
 ### Options inherited from parent commands

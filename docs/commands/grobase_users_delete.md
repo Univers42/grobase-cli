@@ -3,7 +3,7 @@
 Delete a user permanently
 
 ```
-grobase users delete <id> [flags]
+grobase users delete <id|email> [flags]
 ```
 
 ### Options

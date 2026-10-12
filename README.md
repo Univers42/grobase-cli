@@ -76,7 +76,7 @@ Exit codes: `0` ok, `1` error, `2` usage, `3` authentication/authorization, `4` 
 
 ## Commands
 
-`api`, `apps`, `completion`, `context`, `db`, `doctor`, `functions`, `keys`, `login`, `logout`, `orgs`, `query`, `realtime`, `signup`, `status`, `storage`, `tenants`, `token`, `users`, `version`, `whoami`.
+`api`, `apps`, `completion`, `context`, `db`, `doctor`, `functions`, `host`, `keys`, `login`, `logout`, `orgs`, `query`, `realtime`, `signup`, `status`, `storage`, `tenants`, `token`, `users`, `version`, `whoami`.
 
 The full reference is generated from the cobra tree (`grobase docs DIR`, hidden) and committed in [docs/commands](docs/commands). Regenerate with `grobase docs docs/commands`.
 
@@ -101,16 +101,22 @@ See [SECURITY.md](SECURITY.md). In short:
 | gopkg.in/yaml.v3 | `-o yaml` |
 | coder/websocket | realtime; honours the context's TLS trust |
 
+## Migrations, the host, and 404s
+
+- `db migrate --tenant T --mount NAME DIR|FILE...` applies `.sql` files through `/admin/v1/migrate` with the service-role key. Each file is one migration named by its file stem; a directory gives its `*.sql` in name order. The server records names in `_baas_migrations`, so a re-run reports `skipped`. The data plane resolves the mount's DSN itself from the adapter-registry, so no connection string is read or sent. `db list --tenant T` lists that tenant's mounts the same way.
+- `host ps|health|logs|restart` runs fixed `docker` command lines on the grobase machine over the system `ssh` (`--ssh` or the context's `ssh`). `health` exits 1 naming each container that is unhealthy, crash-looping or exited non-zero; `logs` output is redacted line by line; `restart` asks unless `--yes`.
+- A 404 says who answered it: `not deployed` (Kong has no route for the path), `switched off` (the service behind the route has no handler for it), or `not enabled` (a bare 404 that names neither). `status`, `doctor` and every feature error use the same verdict.
+
 ## What it does not do
 
-- No `migrations` command: grobase's migration route (`/admin/v1/migrate`) is an internal admin route that takes a raw database mount, not a user-facing API. `apps` needs the server's self-serve apps enabled; otherwise it reports not enabled.
+- `db migrate` needs a grobase whose data plane has `DATA_PLANE_ADAPTER_REGISTRY_TOKEN` (grobase 8fa693d2 sets it from `ADAPTER_REGISTRY_SERVICE_TOKEN`; before, every migration answered 502 `credential_unavailable`) and whose WAF carries rule 10120 (9f26e792; before, SQL that inserts data answered 403). Only engines with the `ddl` capability migrate (postgresql, mysql); others answer 422. There is no `down`: write a new forward migration. Kong limits a migration body to 256 KB.
+- `host` does not recreate, rebuild, pull or `compose up/down`, and it does not change an engine's configuration: `docker restart` keeps the container as it was. The ssh login must be allowed to run docker.
+- "switched off" cannot be told from "this CLI and the server disagree on the path": grobase answers both with the same bytes on purpose. A JSON 404 is not classified (GoTrue and PostgREST answer an unknown path and a missing row alike) and keeps the "not enabled" wording.
 - `functions deploy` has no `--runtime` flag. `functions logs` cannot tell a missing function from a missing route (both 404).
 - A certificate pin skips expiry and hostname checks by design (the pin is the trust anchor); `doctor` reports expiry separately.
-- The "not enabled" wording is inferred from a 404 on a feature root; it cannot distinguish a disabled feature from a wrong path.
-- Redaction is pattern-based: a secret in an unusual shape inside a response body can slip through `--debug`.
+- Redaction masks every secret the CLI loaded, every value under a credential-named JSON key at any depth, and JWT, `mbk_`, URL-password, Bearer and PEM shapes. A secret the CLI never held, under an innocuous key or in non-JSON text in no known shape, still passes.
 - The file-store passphrase is not confirmed on first creation.
 - Cobra's "unknown command/flag" errors are mapped to exit 2 by message prefix.
-- It does not manage the host, containers or the database engines themselves.
 
 ## Development
 
