@@ -125,6 +125,15 @@ func (r *Resolver) Authorize(ctx context.Context, req *http.Request, mode httpx.
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
+	// The two planes read an app key from different headers. The control plane
+	// (/v1/tenants/me*) takes `Authorization: Bearer mbk_…`; the data plane's query
+	// service reads X-Baas-Api-Key and otherwise verifies `apikey`, which here is the
+	// anon key Kong needs, so `grobase query` answered 401 invalid_api_key with a valid
+	// key (grobase api-key.middleware.ts, b2b data center, 2026-10-12). Sending both
+	// satisfies each plane without the other noticing.
+	if mode == httpx.ModeAPIKey && bearer != "" {
+		req.Header.Set("X-Baas-Api-Key", bearer)
+	}
 	return nil
 }
 
