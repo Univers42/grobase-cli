@@ -1,266 +1,263 @@
-# Connecting to the grobase data center
+# Connecting to the grobase data center from another device
 
-How a second machine reaches the grobase deployment on the born2root VM
-(`b2b`), with the `grobase` CLI and with groot's `make link`. Every route
-below says what was run, when, and what it returned. Routes marked
-**not verified** have not been run end to end; do not rely on them without
-testing them first.
+How a second machine reaches the grobase deployment on the born2root VM, with
+the `grobase` CLI (and with groot's `make link`). §8 lists every check that was
+run and what it returned, and what was not run. Re-run any of them with
+`scripts/check-routes.sh` (§6).
 
-Verified as of 2026-10-12 unless a row says otherwise.
+## 1. The machines
 
-## 1. What you are connecting to
+| Machine | Tailscale node | Addresses | What listens |
+|---|---|---|---|
+| Host (runs the VM) | `dlesieur42-2`, `100.94.109.44` | LAN `192.168.1.132` | LAN edge `192.168.1.132:8443` → the VM's WAF; the VM's ssh on `192.168.1.132:4242` |
+| VM `b2b` (grobase at `/opt/grobase`) | `dlesieur42-1`, `100.94.119.97`, `dlesieur42-1.tail10f2ea.ts.net` | — | WAF `:8443`, ssh `:4242`, Funnel `:443` (public) |
+
+The VM runs Tailscale itself (born2root's `make tailnet`), so the tailnet routes
+reach the VM directly, not through the host. Tailnet: `tail10f2ea.ts.net`.
 
 | Item | Value |
 |---|---|
-| Host (runs the VM) | LAN `192.168.1.132` (`enp7s0`, DHCP), Tailscale `100.94.119.97` |
-| VM | `b2b`, QEMU, grobase at `/opt/grobase` |
-| Tailnet | `tail10f2ea.ts.net`, node `dlesieur42-1` |
-| WAF (what the CLI talks to) | `https://<address>:8443` |
-| ssh into the VM | port `4242`, login `dlesieur` (key only for other devices) |
-| VM CA | `/opt/grobase/certs/track-binocle-local-ca.pem`, copy `~/grobase-ca.pem` |
-| Leaf certificate pin | `28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a` (expires 2027-11-12) |
-
-The WAF listens on the host's loopback, Tailscale and LAN addresses only.
-Nothing is published to the public internet except the Funnel route in §2.5.
+| WAF leaf pin (`--pin-sha256`) | `28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a`, expires 2027-11-12 |
+| VM CA (`--ca-file`) | `/opt/grobase/certs/track-binocle-local-ca.pem` on the VM |
+| Account | `cli-firstconnect-130748@example.com` |
+| Its password and the anon key | in the host's b2b secrets file as `GROBASE_PASSWORD`, `GROBASE_ANON_KEY` (with `GROBASE_EMAIL`) |
 
 ## 2. The routes
 
-| # | Route | URL | Works from | Status |
-|---|---|---|---|---|
-| 2.1 | Same host | `https://127.0.0.1:8445` (after the 2026-10-12 reboot; `8443` before) | the host | verified (doctor, 2 ms) |
-| 2.2 | LAN IP, pinned | `https://192.168.1.132:8443` | same wifi/ethernet, no Tailscale | verified (`doctor` 10/10, 43 ms, 2026-10-12) |
-| 2.3 | LAN name, hosts file + CA | `https://grobase.track-binocle.test:8443` | same wifi, no Tailscale | verified with `curl` (2026-10-12) and CLI signup (2026-10-11); **not verified from a second device** |
-| 2.4 | Tailscale IP | `https://100.94.119.97:8443` | any network with Tailscale | verified (CLI, 2026-10-11; `curl` 401 = WAF answers, 2026-10-12) |
-| 2.5 | Tailscale name (MagicDNS) | `https://dlesieur42-1.tail10f2ea.ts.net:8443` | a device whose DNS resolves ts.net | verified through `curl --resolve` (2026-10-12); **not verified through DNS from this host** (see §7) |
-| 2.6 | Funnel (public) | `https://dlesieur42-1.tail10f2ea.ts.net` (443) | any internet connection | verified with `curl --resolve` to the public address 176.58.90.46, returns 401 from the WAF (2026-10-12); **CLI through Funnel not verified**; **not verified from outside the owner's network** |
-| 2.7 | ssh tunnel | `https://127.0.0.1:18443` via `ssh -L` | a network that allows only ssh out | verified through `doctor` (2026-10-12, 4 ms) |
-| 2.8 | ssh for `make link` | `ssh://dlesieur@100.94.119.97:4242` | any device on the tailnet with a key on the VM | verified (2026-10-11 runbook); **a second device not verified** |
+| Route | URL / target | Works from | Proven on 2026-10-12 (§8) |
+|---|---|---|---|
+| `lan-ip` | `https://192.168.1.132:8443` + pin | same LAN / wifi | yes, from a container through the host firewall; not from a physical wifi device |
+| `lan-name` | `https://grobase.track-binocle.test:8443` | same LAN, hosts-file entry | only with `curl --resolve` on the host |
+| `tailnet-ip` | `https://100.94.119.97:8443` + pin | any network, Tailscale | yes, from a separate tailnet node over the internet relay (DERP) |
+| `magicdns` | `https://dlesieur42-1.tail10f2ea.ts.net:8443` + pin | any network, Tailscale with its DNS | yes, same node; not on a machine running hide (§7) |
+| `funnel` | `https://dlesieur42-1.tail10f2ea.ts.net` (443, public cert) | any internet connection, no Tailscale | yes, over the public internet |
+| `ssh-tailnet` | `ssh -p 4242 dlesieur@100.94.119.97` | any network, Tailscale | yes, key login through the separate node |
+| `ssh-lan` | `ssh -p 4242 dlesieur@192.168.1.132` | same LAN | banner, from a container through the host firewall |
+| ssh tunnel | `ssh -N -L 127.0.0.1:18443:127.0.0.1:8443 -p 4242 dlesieur@100.94.119.97`, then `https://127.0.0.1:18443` | a network that lets only ssh out | 2026-10-12 earlier, `doctor` through the tunnel |
 
-Failover: a context can list several URLs. The CLI probes them in order and
-uses the first that answers `GET /auth/v1/health`; a URL that does not answer
-costs `GROBASE_PROBE_TIMEOUT` (default 2 s). Verified 2026-10-12: a dead
-first URL fell through to an alternate, `doctor` named the alternate in its
-`via` column.
+Funnel publishes the WAF to the whole internet. The pin does not apply to it:
+its certificate is a public one, so the CLI trusts it through the system roots.
 
-Not verified at all: WiFi from a network other than the owner's, and any
-device other than this host. The steps for those are in §5 and §6; they are
-the standard steps, not a tested recipe.
+## 3. On the other device: Tailscale
 
-## 3. Prerequisites
+Skip this for the LAN-only and Funnel routes.
 
-1. **The CLI.** Build from source, using Go 1.26.9 (the `go.mod` minimum):
+**With root (your own laptop):**
+
+```sh
+curl -fsSL https://tailscale.com/install.sh | sh     # or the package from tailscale.com/download
+sudo tailscale up                                    # opens a login URL
+```
+
+Log in with the account that owns the tailnet `tail10f2ea.ts.net` (on the host,
+`tailscale whois 100.94.119.97` names it). Then check:
+
+```sh
+tailscale status | grep dlesieur42-1                 # the VM node is listed
+tailscale ping dlesieur42-1                          # "pong … via DERP(…)" or "via <ip>:<port>"
+getent hosts dlesieur42-1.tail10f2ea.ts.net          # 100.94.119.97 = MagicDNS works
+```
+
+**Without root (a 42 seat):** run Tailscale in userspace mode. It has no network
+interface, so programs reach the tailnet through its proxy. This is the setup
+§8 test B ran. Take `tailscale` and `tailscaled` from the static tarball at
+`pkgs.tailscale.com/stable/#static` and put both on your `PATH`.
+
+```sh
+tailscaled --tun=userspace-networking --socks5-server=127.0.0.1:1055 \
+    --state="$HOME/.local/share/tailscale/state" --socket="$HOME/.local/share/tailscale/sock" &
+tailscale --socket="$HOME/.local/share/tailscale/sock" up
+export HTTPS_PROXY=socks5://127.0.0.1:1055           # the CLI then reaches the tailnet, names included
+```
+
+Use a CLI built from commit `7cb3ba9` or later. Before it, `doctor` and
+`context add` checked the certificate with a direct connection that ignored
+`HTTPS_PROXY`, so they failed in this mode even though requests worked.
+
+## 4. On the other device: the CLI and the account
+
+1. **Install the CLI** (Go 1.26.9 or later; or build it in a container):
 
    ```sh
-   git clone https://github.com/Univers42/grobase-cli
-   cd grobase-cli
-   docker run --rm -v "$PWD":/src -w /src golang:1.26.9 \
+   go install github.com/Univers42/grobase-cli/cmd/grobase@main
+   # without Go:
+   git clone https://github.com/Univers42/grobase-cli && cd grobase-cli
+   docker run --rm -v "$PWD":/src -w /src -e CGO_ENABLED=0 golang:1.26.9 \
        go build -buildvcs=false -o /src/grobase ./cmd/grobase
    install -m 0755 grobase ~/.local/bin/grobase
-   grobase version
    ```
 
-   `-buildvcs=false` is needed when building inside a container; without it
-   the build fails with `error obtaining VCS status`.
+2. **Bring the three values** from the host's secrets file (`GROBASE_EMAIL`,
+   `GROBASE_PASSWORD`, `GROBASE_ANON_KEY`) through your password manager. Never
+   paste them into a chat, a ticket or a shell history.
 
-2. **The VM CA.** Copy it from the VM, then check the fingerprint against the
-   VM's own copy. The certificate is public; its key never leaves the VM.
+3. **One context for every route**, in the order to try them (the first that
+   answers is used; one that does not costs 2 s, `GROBASE_PROBE_TIMEOUT`):
 
    ```sh
-   scp -P 4242 dlesieur@100.94.119.97:/opt/grobase/certs/track-binocle-local-ca.pem ~/grobase-ca.pem
-   openssl x509 -noout -fingerprint -sha256 -in ~/grobase-ca.pem
-   ssh -p 4242 dlesieur@100.94.119.97 \
-       'openssl x509 -noout -fingerprint -sha256 -in /opt/grobase/certs/track-binocle-local-ca.pem'
+   grobase context add b2b \
+     --url https://192.168.1.132:8443 \
+     --url https://dlesieur42-1.tail10f2ea.ts.net:8443 \
+     --url https://100.94.119.97:8443 \
+     --pin-sha256 28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a \
+     --yes
    ```
 
-   The two lines must match. Last recorded value: `7B:22:BB:3A:…:2F:EE`
-   (full value in the runbook). Never use `--insecure-skip-verify` or `curl -k`.
+   Off the tailnet, add the public route as its own context, because its
+   certificate is different:
+   `grobase context add b2b-public --url https://dlesieur42-1.tail10f2ea.ts.net --yes`.
 
-3. **ssh key (only for `make link` over ssh, and for the VM).** From the new
-   device, once, over Tailscale:
+4. **First connection with the account** (anon key first, then the password,
+   both on stdin):
 
    ```sh
-   ssh-keygen -t ed25519            # if you have no key yet
-   ssh-copy-id -p 4242 dlesieur@100.94.119.97
-   ssh -p 4242 dlesieur@100.94.119.97 true && echo key-ok
+   read -rs -p 'anon key: ' AK; echo; read -rs -p 'password: ' PW; echo
+   printf '%s\n%s\n' "$AK" "$PW" | grobase login --email cli-firstconnect-130748@example.com \
+       --anon-key-stdin --password-stdin
+   unset AK PW
+   grobase whoami          # user {"email":"cli-firstconnect-130748@example.com", …}
+   grobase doctor          # the reachability row names the URL in use
    ```
 
-   The VM password is for the owner only; use the key.
+   A new account instead: `grobase signup --email you@example.com
+   --anon-key-stdin --password-stdin` (the VM confirms emails itself, so signup
+   also signs you in).
 
-4. **The API keys.** The anon key is needed by GoTrue for every login. It is
-   stored on the VM in `/opt/grobase/.env` as `ANON_KEY` (set, verified by
-   name only). Read it straight into the CLI so the value never lands in your
-   shell history or on screen:
+5. **Reset a forgotten password** (admin; needs the service-role key, which
+   stays on the VM). Use a throwaway config so the admin key is not left in
+   your store:
 
    ```sh
-   ssh -p 4242 dlesieur@100.94.119.97 'sed -n "s/^ANON_KEY=//p" /opt/grobase/.env'
+   export GROBASE_CONFIG=$(mktemp -d)/config.json GROBASE_PASSPHRASE=$(head -c 24 /dev/urandom | base64)
+   grobase context add adm --url https://100.94.119.97:8443 --yes \
+       --pin-sha256 28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a
+   ssh -p 4242 dlesieur@100.94.119.97 'sed -n "s/^SERVICE_ROLE_KEY=//p" /opt/grobase/.env' |
+       grobase login --service-role --credential-store file
+   read -rs -p 'new password: ' PW; echo
+   printf '%s\n' "$PW" | grobase users update cli-firstconnect-130748@example.com \
+       --password-stdin --credential-store file
+   rm -rf "$(dirname "$GROBASE_CONFIG")"; unset GROBASE_CONFIG GROBASE_PASSPHRASE PW
    ```
 
-   The service-role key (`SERVICE_ROLE_KEY`, also set) is needed only for
-   admin commands such as `grobase users list`. Read it with
-   `--service-role` on stdin; never store it in a shell variable or a file.
+   Passing an email to `users update` needs CLI `59d2393` or later. Before it
+   the email went into the URL unchanged and the WAF answered 403.
 
-## 4. The first connection with the CLI (this is the one that matters)
+## 5. ssh into the VM from the other device
 
-```sh
-# 1. one context, every route in the order to try them
-grobase context add b2b \
-  --url https://192.168.1.132:8443 \
-  --url https://dlesieur42-1.tail10f2ea.ts.net:8443 \
-  --url https://100.94.119.97:8443 \
-  --pin-sha256 28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a \
-  --yes
-
-# 2. first time only: create the account (the VM auto-confirms emails, so
-#    signup signs you in at once). The anon key is read first, then the password.
-read -rs -p "password: " PASS; echo
-{ ssh -p 4242 dlesieur@100.94.119.97 'sed -n "s/^ANON_KEY=//p" /opt/grobase/.env'
-  printf '%s\n' "$PASS"; } |
-  grobase signup --email you@example.com --anon-key-stdin --password-stdin
-unset PASS
-
-# 3. every later time
-grobase login --email you@example.com --password-stdin --anon-key-stdin
-
-# 4. check
-grobase whoami
-grobase doctor            # the reachability row names the URL in use
-grobase status            # every endpoint of the context
-```
-
-Notes:
-
-- Use `--ca-file ~/grobase-ca.pem` instead of `--pin-sha256` if you want the
-  name in the certificate to be checked. Then every URL must be a name the
-  certificate covers (`grobase.track-binocle.test`, `*.track-binocle.test`,
-  the ts.net name, `100.94.119.97`, `127.0.0.1`); the bare LAN IP is not in it,
-  so a LAN IP URL needs the pin. Verified 2026-10-12: a context with
-  `--ca-file` and the LAN IP fails TLS; with `--pin-sha256` it passes.
-- `grobase context show b2b` displays the first stored URL, not the one in
-  use. Use `grobase context env b2b` to see the URL that was chosen, or
-  `grobase doctor`.
-- `--pin-sha256` takes the bare 64 hex digits. The `sha256:` prefix is
-  rejected.
-- The credential store is mode 600. `doctor`'s `tls` row PASSes with the pin
-  and only WARNs when the CA is not a system root.
-- When the leaf certificate is re-issued (it expires 2027-11-12) `doctor`
-  FAILs the `tls` row and shows both fingerprints. Check the new value on the
-  VM with `openssl x509 -noout -fingerprint -sha256 -in /opt/grobase/certs/localhost.pem`,
-  then run `grobase context pin b2b`.
-
-Other useful commands, all verified against the live deployment:
+Once, from a device on the tailnet (or on the LAN, `192.168.1.132`):
 
 ```sh
-grobase api GET /auth/v1/health            # any endpoint; METHOD is required
-grobase api GET /query/v1/engines
-grobase api POST /path --input body.json    # labels the body application/json
-grobase realtime subscribe pg/<table>/updated
+ssh-keygen -t ed25519                                  # if the device has no key
+ssh-copy-id -p 4242 dlesieur@100.94.119.97             # asks the VM password once
+ssh -p 4242 dlesieur@100.94.119.97 true && echo key-ok
 ```
 
-## 5. From another device: the paths in order
+In Tailscale userspace mode ssh needs the proxy too:
+`ssh -o ProxyCommand='nc -X 5 -x 127.0.0.1:1055 %h %p' -p 4242 dlesieur@100.94.119.97`.
 
-Try them in this order. Each step tells you what to look for.
-
-**a. Same wifi as the host, no Tailscale.** Use route 2.2 (LAN IP with the
-pin). `grobase doctor` should show `via https://192.168.1.132:8443`. If the
-LAN edge is down, the row shows a timeout and the next URL in the context is
-tried. Not verified from a second device.
-
-**b. Same wifi, LAN name.** Add a hosts entry on the device:
-
-- Linux/macOS: `sudo sh -c 'echo "192.168.1.132 grobase.track-binocle.test" >> /etc/hosts'`
-- Windows: add the same line to `C:\Windows\System32\drivers\etc\hosts` as administrator.
-
-Then use `~/grobase-ca.pem` as `--ca-file` with the name URL. Verified from
-this host with `curl --resolve` (2026-10-12); not verified from a second
-device.
-
-**c. Any network, Tailscale.** Install Tailscale on the device and sign in
-with the same account that owns the tailnet `tail10f2ea.ts.net` (the owner
-approves the device in the admin console, or shares the node). Then route
-2.4 (IP) works immediately; route 2.5 (name) works if the device's DNS uses
-Tailscale's resolver (MagicDNS is on). **Not verified from a second device.**
-
-**d. Outside, public internet.** Route 2.6 (Funnel) answers with a public
-certificate, so the CLI needs no CA file. `curl https://dlesieur42-1.tail10f2ea.ts.net/auth/v1/health`
-returns 401 from the WAF (the health route needs the anon key; a 401 proves
-the path). **The CLI through Funnel has not been run.** Funnel publishes the
-WAF to the internet, which is a decision for the owner.
-
-**e. Only ssh allowed out.** Open the tunnel and point a context at it:
+## 6. Test every route in one command
 
 ```sh
-ssh -N -L 127.0.0.1:18443:127.0.0.1:8443 -p 4242 dlesieur@100.94.119.97
-grobase context add tunnel --url https://127.0.0.1:18443 --pin-sha256 28e27b66a18a90d701a406fbb479c071a26d08cc2fe250a7bb329d327e780c7a --yes
+scripts/check-routes.sh                                          # reach + TLS
+GROBASE_EMAIL=… GROBASE_PASSWORD=… GROBASE_ANON_KEY=… scripts/check-routes.sh   # + login, whoami
+ROUTES="tailnet-ip magicdns funnel" scripts/check-routes.sh      # a subset
 ```
 
-Verified 2026-10-12: the tunnel URL answered `doctor` (4 ms) as one URL of the
-`b2b` context. The separate `tunnel` context above is the same command pattern
-but has not been run as its own context.
+It uses a throwaway config, so your contexts and stored login are not touched.
+It prints one line per route (`PASS`, `FAIL` with the reason, or `SKIP`) and
+exits 0 when at least one passed. Expected results by where the device is:
 
-## 6. groot: the `make link` steps
+| Device | Should PASS | Expected FAIL |
+|---|---|---|
+| Same wifi, no Tailscale | `lan-ip`, `ssh-lan`, `funnel`; `lan-name` with the hosts entry | `tailnet-ip`, `magicdns`, `ssh-tailnet` |
+| Elsewhere, Tailscale | `tailnet-ip`, `magicdns`, `ssh-tailnet`, `funnel` | `lan-*`, `ssh-lan` |
+| Elsewhere, no Tailscale | `funnel` | everything else |
 
-groot runs its frontends against grobase through a link. Clone it fresh:
-
-```sh
-git clone --recursive -b feat/grobase-datacenter-link <groot-url> groot
-cd groot
-```
-
-Do **not** run plain `make all` on this branch: it fast-forwards the
-submodules and drops the pinned grobase and osionos commits the link needs.
-Use `make all SKIP_SYNC=1`, or skip `make all` and run the link targets.
-
-Create `.env.grobase-link` (git-ignored) with the route you chose:
-
-```sh
-GROBASE_TARGET=ssh://dlesieur@100.94.119.97:4242     # route 2.8, the default that was verified
-# or GROBASE_TARGET=https://100.94.119.97:8443       # direct, over Tailscale
-GROBASE_CA_FILE=~/grobase-ca.pem
-```
-
-Then:
-
-```sh
-make link                 # writes the link, starts the relay
-make link-frontends-up
-make link-verify          # "verify: N frontends reach grobase through the … link"
-make link-status          # exit 0 when healthy
-```
-
-Verified 2026-10-11: `make link` (9 frontends, direct), `make link-e2e` (11
-passed). Verified 2026-10-12: the self-heal drill restarted the link and
-`link-verify` passed (6 frontends, ssh). The `ssh://` target is the one
-verified after the reboot. Direct mode with `GROBASE_CA_FILE` is verified on
-the host only.
+The ssh check reads the banner over a plain socket: it ignores `HTTPS_PROXY`
+and does not prove your key works (§5 does).
 
 ## 7. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `doctor` `dns/reachability` FAIL on the ts.net name, `getent hosts` empty | This host's system resolver does not use MagicDNS (100.100.100.100 times out). Verified 2026-10-12. | Use the IP URL on this host. On a device with Tailscale DNS on, the name resolves. |
-| TLS verification fails on the LAN IP with `--ca-file` (`curl` returns 000) | `--ca-file` with a LAN IP. The cert has no LAN SAN. Verified 2026-10-12. | Use `--pin-sha256` for that URL, or the hosts name. |
-| `tls` FAIL with two fingerprints | Leaf re-issued. | Verify the new fingerprint on the VM, then `grobase context pin b2b`. |
-| Dead port 8443 on `127.0.0.1` | After the 2026-10-12 host reboot the VM's forward was on 8445 until the born2root port fix takes effect at the VM's next start. | Use the LAN edge or Tailscale URL, or 8445 on the host. |
-| `context show` shows a URL you did not expect | It prints the first stored URL. | `grobase context env b2b` or `grobase doctor`. |
-| `grobase users list` 401/403 | Needs the service-role key via `--service-role` on stdin. | Not verified with the service key in this session. |
-| Build error `error obtaining VCS status` | Build inside a container without `-buildvcs=false`. | Add the flag. |
-| Build error `go.mod requires go >= 1.26.9` | Older Go in the container. | Use `golang:1.26.9`. |
+| `magicdns` / `funnel` FAIL with `lookup … i/o timeout` on a machine running hide | hide hijacked every DNS query, including Tailscale's resolver `100.100.100.100` (TCP and UDP port 53 timed out while `http://100.100.100.100` answered 200) | hide branch `fix/magicdns` (`209f390`) exempts that resolver; install it (born2root report). Until then use the IP routes |
+| `tls FAIL connect …: dial tcp: lookup …` only with `HTTPS_PROXY` set | CLI older than `7cb3ba9` probes the certificate without the proxy | update the CLI |
+| LAN route FAILs with the CA file | the certificate has no SAN for `192.168.1.132` | use the pin, or the hosts name with the CA |
+| LAN route times out from a wifi device, works from the host | the wifi isolates clients (guest network, campus wifi) | Tailscale, or Funnel |
+| `doctor` `tls` FAIL with two fingerprints | the leaf was re-issued | check `openssl x509 -noout -fingerprint -sha256 -in /opt/grobase/certs/localhost.pem` on the VM, then `grobase context pin b2b` |
+| `users update <email>` 403 | CLI older than `59d2393` | update, or pass the id from `grobase users get <email>` |
+| `context show` names a URL you did not expect | it prints the first stored URL | `grobase context env b2b` or `doctor` show the one in use |
+| `error obtaining VCS status` / `go.mod requires go >= 1.26.9` when building | container build | `-buildvcs=false`; `golang:1.26.9` |
 
-## 8. Verification record
+## 8. What was run
 
-| Check | Route | Date | Result |
+All on 2026-10-12, with the static CLI built from `7cb3ba9` and
+`scripts/check-routes.sh`, as the account above (login and whoami on every
+HTTPS route).
+
+The test devices were stand-ins on the host. **A** is a container on Docker's
+bridge network: its packets reach `192.168.1.132` from outside the host's
+loopback, through the host firewall (ufw, default DROP), as a LAN device's do.
+**B** is a separate, ephemeral Tailscale node (`tailscale/tailscale:v1.102.5`,
+userspace mode), forced onto Tailscale's relays (`TS_DEBUG_ALWAYS_USE_DERP`),
+which is the path a device on another network takes when no direct path exists.
+**C** is a container that left through the public internet (direct, not Tor)
+and resolved the name through public DNS (`1.1.1.1`), as a device without
+Tailscale does.
+
+| # | Device | Route | Result |
 |---|---|---|---|
-| `grobase doctor` 10/10 | LAN IP pin | 2026-10-12 | pass |
-| `grobase doctor`, one dead URL then alternate | failover | 2026-10-12 | pass, 2 s |
-| `grobase signup` then `login`, `whoami` | LAN name (signup), Tailscale name (login) | 2026-10-11 | pass |
-| `grobase` context over the Tailscale IP, `doctor` | Tailscale IP, CA file | 2026-10-11 | pass |
-| `curl --resolve` to the ts.net name | Tailscale name | 2026-10-12 | 401 from WAF |
-| `curl --resolve` to the public address | Funnel | 2026-10-12 | 401 from WAF |
-| `make link-verify`, `make link-e2e` | groot, direct and ssh | 2026-10-11 | pass |
-| `grobase doctor` through `ssh -L` tunnel | tunnel | 2026-10-12 | pass, 4 ms |
-| CLI through Funnel | Funnel | — | **not run** |
-| CLI or groot from a second physical device | all | — | **not run** |
-| Wifi on a network other than the owner's | all | — | **not run** |
-| `grobase users list` with the service key | admin | — | **not run** |
+| A | bridge container | `lan-ip` | PASS, 42 ms, login + whoami |
+| A | bridge container | `ssh-lan` | PASS, banner `SSH-2.0-OpenSSH_10.0p2` |
+| A | bridge container | `tailnet-ip`, `ssh-tailnet` | PASS (forwarded through the host's node) |
+| B | tailnet node over DERP | path to the VM | `pong from dlesieur42-1 via DERP(mad) in 8ms` |
+| B | tailnet node over DERP | MagicDNS | `dlesieur42-1.tail10f2ea.ts.net` → `100.94.119.97` |
+| B | tailnet node over DERP | `tailnet-ip` | PASS, 35 ms, login + whoami |
+| B | tailnet node over DERP | `magicdns` | PASS, 29 ms, login + whoami |
+| B | tailnet node over DERP | ssh | key login, `ssh ok: dlesieur42 dlesieur` |
+| B | same node, CLI `2ffd17d` | `magicdns` | FAIL on `tls` (the probe ignored the proxy; fixed in `7cb3ba9`) |
+| C | public internet | `funnel` | PASS, 1118 ms, login + whoami; name resolved to `176.58.90.145` |
+| — | host | `lan-ip`, `tailnet-ip`, `ssh-*` | PASS; `magicdns`, `funnel` FAIL (hide's DNS, §7) |
 
-Per-run output is in `groot/wiki/runbooks/grobase-link.md` under "Verified".
+Not run:
+
+- A physical second computer or phone, on this wifi or on another network.
+  The stand-ins cover the host side of each path, not a wifi that isolates
+  clients or a network that blocks Tailscale's relays.
+- groot's `make link` from another device. The 2026-10-11 runbook records it
+  from the host over the Tailscale IP: `groot/wiki/runbooks/grobase-link.md`.
+- `lan-name` from a device (only `curl --resolve` on the host).
+- MagicDNS on this host after hide's fix: it needs the fix installed (root).
+
+## 9. groot
+
+groot's frontends reach grobase through a link. On the other device:
+
+```sh
+git clone --recursive -b feat/grobase-datacenter-link git@github.com:Univers42/groot.git groot && cd groot
+```
+
+Do not run plain `make all` on that branch. It fast-forwards the submodules
+and drops the pinned grobase and osionos commits the link needs. Use
+`make all SKIP_SYNC=1`, or only the link targets.
+
+`.env.grobase-link` (git-ignored), one of:
+
+```sh
+GROBASE_TARGET=ssh://dlesieur@100.94.119.97:4242   # needs the ssh key (§5); fetches the VM's secrets itself
+GROBASE_TARGET=https://100.94.119.97:8443          # direct; then also:
+GROBASE_CA_FILE=$HOME/grobase-ca.pem               # copied from the VM, fingerprint checked
+```
+
+```sh
+make link && make link-frontends-up && make link-verify    # "verify: N frontends reach grobase …"
+```
+
+Copy the CA for direct mode, and compare its fingerprint with the VM's:
+
+```sh
+scp -P 4242 dlesieur@100.94.119.97:/opt/grobase/certs/track-binocle-local-ca.pem ~/grobase-ca.pem
+openssl x509 -noout -fingerprint -sha256 -in ~/grobase-ca.pem
+ssh -p 4242 dlesieur@100.94.119.97 openssl x509 -noout -fingerprint -sha256 \
+    -in /opt/grobase/certs/track-binocle-local-ca.pem
+```

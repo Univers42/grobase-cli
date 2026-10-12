@@ -28,6 +28,9 @@ Secrets are never flag values: they come from a prompt, stdin or an environment 
 
 Connecting from another device (LAN, wifi, Tailscale, Funnel, ssh tunnel) with
 one context and a pinned certificate: [docs/CONNECTING.md](docs/CONNECTING.md).
+`scripts/check-routes.sh` tests every route from the device it runs on. Behind a
+proxy (`HTTPS_PROXY`, including Tailscale's userspace SOCKS5), the CLI uses it
+for requests and for the certificate check.
 
 ## Contexts
 
