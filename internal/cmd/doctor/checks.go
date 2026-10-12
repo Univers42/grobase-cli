@@ -198,7 +198,7 @@ func authVerdict(r *run, kinds []string) []check {
 		case apiErr.Unauthorized():
 			return row("auth", resultFail, fmt.Sprintf("%s answered %d: the credential was rejected: run `grobase login`", path, apiErr.Status))
 		case apiErr.NotFound():
-			return row("auth", resultWarn, path+" is not enabled on this deployment, so the credential could not be proven")
+			return row("auth", resultWarn, path+" is "+apiErr.Miss().FeatureState()+" on this deployment, so the credential could not be proven")
 		}
 	}
 	return row("auth", resultFail, err.Error())
@@ -221,8 +221,9 @@ func featurePaths() []string {
 	return []string{"/v1/orgs", "/query/v1/engines", "/functions/v1/", "/realtime/v1/"}
 }
 
-// feature probes one flag-gated route without a credential. Both outcomes are a
-// PASS, the answer being the detail; only a probe that could not be made fails.
+// feature probes one flag-gated route without a credential. Every answer is a PASS, the
+// detail saying which: enabled, or a 404's verdict (not deployed: no gateway route;
+// switched off: no handler behind the route); only a probe that could not be made fails.
 func feature(r *run, path string) check {
 	name := "feature " + path
 	resp, err := r.plain.Do(r.ctx, httpx.Request{Method: http.MethodGet, Path: path, Mode: httpx.ModeNone})
@@ -232,7 +233,7 @@ func feature(r *run, path string) check {
 	if err != nil {
 		var apiErr *httpx.APIError
 		if errors.As(err, &apiErr) && apiErr.NotFound() {
-			return check{name: name, result: resultPass, detail: "not enabled on this deployment"}
+			return check{name: name, result: resultPass, detail: apiErr.Miss().FeatureState() + " on this deployment"}
 		}
 		if !errors.As(err, &apiErr) {
 			return check{name: name, result: resultFail, detail: err.Error()}

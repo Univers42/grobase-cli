@@ -83,12 +83,16 @@ func probe(ctx context.Context, cl *httpx.Client, path string) result {
 		return r
 	}
 	r.status, r.state = strconv.Itoa(apiErr.Status), state(apiErr.Status)
+	if apiErr.NotFound() {
+		r.state = apiErr.Miss().FeatureState()
+	}
 	return r
 }
 
-// state turns a status into the reported state. A 404 means the deployment does
-// not carry the feature and a 5xx that it is broken; anything else, 401 and 403
-// included, proves the route is served.
+// state turns a status into the reported state. A 404 means the deployment does not
+// carry the feature (probe refines it into not deployed or switched off when the body
+// says which) and a 5xx that it is broken; anything else, 401 and 403 included, proves
+// the route is served.
 func state(code int) string {
 	switch {
 	case code == http.StatusNotFound:

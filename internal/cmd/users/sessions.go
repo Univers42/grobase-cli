@@ -2,7 +2,6 @@ package users
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -54,11 +53,7 @@ func runSessionsRevoke(ctx context.Context, e *env.Env, id string, yes bool) err
 	}
 	err = cl.JSON(ctx, adminReq(http.MethodPost, adminUsersPath+"/"+httpx.Seg(id)+"/logout"), nil)
 	if err != nil {
-		var apiErr *httpx.APIError
-		if errors.As(err, &apiErr) && apiErr.NotFound() {
-			return fmt.Errorf("session revocation: not enabled on this deployment: %w", err)
-		}
-		return err
+		return httpx.NotEnabled("session revocation", err)
 	}
 	_, err = fmt.Fprintf(e.Stdout, "revoked every session of user %s\n", id)
 	return err
