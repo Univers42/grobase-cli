@@ -1,6 +1,7 @@
 package functions_test
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -17,8 +18,8 @@ import (
 const serviceKey = "service-role-fn-123"
 
 type seen struct {
-	method, uri, ctype, auth, body string
-	hits                           int
+	method, uri, ctype, auth, body, tenant string
+	hits                                   int
 }
 
 func call(t *testing.T, status int, reply, stdin string, args ...string) (int, *seen, string) {
@@ -27,6 +28,7 @@ func call(t *testing.T, status int, reply, stdin string, args ...string) (int, *
 	h := testenv.New(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		s.method, s.uri, s.ctype, s.auth, s.body = r.Method, r.URL.RequestURI(), r.Header.Get("Content-Type"), r.Header.Get("Authorization"), string(b)
+		s.tenant = r.Header.Get("X-Baas-Tenant-Id")
 		s.hits++
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(reply))
@@ -35,10 +37,25 @@ func call(t *testing.T, status int, reply, stdin string, args ...string) (int, *
 	return exitcode.Of(err), s, h.Out.String() + h.Err.String()
 }
 
-func TestListUsesServiceRole(t *testing.T) {
-	code, s, out := call(t, 200, `[{"name":"f"}]`, "", "list")
+// The webhook-dispatcher scopes the triggers by tenant and answered 401 "missing tenant
+// header" to a list that sent none.
+func TestListSendsTheTenantWithTheServiceRole(t *testing.T) {
+	code, s, out := call(t, 200, `[{"name":"f"}]`, "", "list", "--tenant", "agency")
 	if code != 0 || s.uri != "/admin/v1/function-triggers" || s.auth != "Bearer "+serviceKey || !strings.Contains(out, `"f"`) {
 		t.Fatalf("exit %d, %+v, %s", code, s, out)
+	}
+	if s.tenant != "agency" {
+		t.Fatalf("X-Baas-Tenant-Id = %q, want agency", s.tenant)
+	}
+}
+
+func TestListWithoutTenantIsAUsageErrorNamingTheFlag(t *testing.T) {
+	hits := 0
+	h := testenv.New(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits++ }),
+		map[string]string{secret.KindServiceRole: serviceKey}, "")
+	err := h.Run(functions.New(h.Env), "list")
+	if exitcode.Of(err) != exitcode.Usage || hits != 0 || !strings.Contains(fmt.Sprint(err), "--tenant") {
+		t.Fatalf("exit %d, hits %d, err %v: want a usage error naming --tenant and no request", exitcode.Of(err), hits, err)
 	}
 }
 
@@ -78,7 +95,7 @@ func TestLogsQueryAndNotEnabled(t *testing.T) {
 }
 
 func TestStatusToExitCode(t *testing.T) {
-	for _, args := range [][]string{{"list"}, {"invoke", "f"}, {"logs", "f"}} {
+	for _, args := range [][]string{{"list", "--tenant", "t1"}, {"invoke", "f"}, {"logs", "f"}} {
 		for status, want := range map[int]int{401: exitcode.AuthFail, 403: exitcode.AuthFail, 404: exitcode.NotFound, 502: exitcode.Failure} {
 			if code, _, out := call(t, status, `{"msg":"x"}`, "", args...); code != want || strings.Contains(out, serviceKey) {
 				t.Errorf("%v %d: exit %d, want %d", args, status, code, want)

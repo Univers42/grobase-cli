@@ -24,6 +24,6 @@ List, deploy, invoke and read the logs of edge functions
 * [grobase](grobase.md)	 - Remote controller for a self-hosted grobase platform
 * [grobase functions deploy](grobase_functions_deploy.md)	 - Upload the source of a function (streamed from FILE)
 * [grobase functions invoke](grobase_functions_invoke.md)	 - Call a function and print its response
-* [grobase functions list](grobase_functions_list.md)	 - List the function triggers of the deployment (needs the service role)
+* [grobase functions list](grobase_functions_list.md)	 - List the function triggers of one tenant (needs the service role)
 * [grobase functions logs](grobase_functions_logs.md)	 - Show the recent log lines of a function
 

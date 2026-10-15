@@ -1,15 +1,16 @@
 ## grobase functions list
 
-List the function triggers of the deployment (needs the service role)
+List the function triggers of one tenant (needs the service role)
 
 ```
-grobase functions list [flags]
+grobase functions list --tenant ID [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list
+  -h, --help            help for list
+      --tenant string   tenant whose function triggers to list (required)
 ```
 
 ### Options inherited from parent commands

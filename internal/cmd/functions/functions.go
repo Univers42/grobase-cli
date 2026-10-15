@@ -39,24 +39,34 @@ func fnPath(name string, rest ...string) string {
 	return p
 }
 
+// The triggers live on the webhook-dispatcher, which scopes them by tenant and answered
+// 401 "missing tenant header" to a list without one. deploy, invoke and logs need no
+// --tenant: on /functions/ Kong drops a client tenant header and takes the tenant from
+// the credential (grobase kong.yml, pre-function).
 func newListCmd(e *env.Env) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List the function triggers of the deployment (needs the service role)",
+	var tenant string
+	cmd := &cobra.Command{
+		Use:   "list --tenant ID",
+		Short: "List the function triggers of one tenant (needs the service role)",
 		Args:  exitcode.Args(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if tenant == "" {
+				return exitcode.Usagef("--tenant is required: function triggers are listed per tenant")
+			}
 			cl, _, err := e.Client()
 			if err != nil {
 				return err
 			}
 			var out any
-			req := httpx.Request{Method: http.MethodGet, Path: "/admin/v1/function-triggers", Mode: httpx.ModeService}
+			req := httpx.TenantRequest(http.MethodGet, "/admin/v1/function-triggers", tenant, nil)
 			if err := cl.JSON(cmd.Context(), req, &out); err != nil {
 				return httpx.NotEnabled("functions", err)
 			}
 			return e.Printer().Print(out)
 		},
 	}
+	cmd.Flags().StringVar(&tenant, "tenant", "", "tenant whose function triggers to list (required)")
+	return cmd
 }
 
 func newDeployCmd(e *env.Env) *cobra.Command {
