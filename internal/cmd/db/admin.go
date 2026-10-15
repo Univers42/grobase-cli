@@ -18,18 +18,10 @@ import (
 // (TENANT_SELFSERVE_ENABLED), and it never returns a connection string.
 const adminMountsPath = "/admin/v1/databases"
 
-// tenantRequest is a service-role request on behalf of one tenant.
-func tenantRequest(method, path, tenant string, body any) httpx.Request {
-	return httpx.Request{
-		Method: method, Path: path, Mode: httpx.ModeService, JSON: body,
-		Header: http.Header{"X-Baas-Tenant-Id": {tenant}},
-	}
-}
-
 // tenantMounts lists one tenant's mounts with the service-role key.
 func tenantMounts(ctx context.Context, cl *httpx.Client, tenant string) ([]map[string]any, error) {
 	var raw json.RawMessage
-	if err := cl.JSON(ctx, tenantRequest(http.MethodGet, adminMountsPath, tenant, nil), &raw); err != nil {
+	if err := cl.JSON(ctx, httpx.TenantRequest(http.MethodGet, adminMountsPath, tenant, nil), &raw); err != nil {
 		return nil, httpx.NotEnabled("tenant mounts", err)
 	}
 	rows, err := decodeRows(raw, "mounts")

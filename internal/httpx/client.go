@@ -69,6 +69,15 @@ type Request struct {
 	Mode          Mode
 }
 
+// TenantRequest is a service-role request on behalf of one tenant: the /admin/v1
+// routes behind Kong read the tenant from X-Baas-Tenant-Id.
+func TenantRequest(method, path, tenant string, body any) Request {
+	return Request{
+		Method: method, Path: path, Mode: ModeService, JSON: body,
+		Header: http.Header{"X-Baas-Tenant-Id": {tenant}},
+	}
+}
+
 // Seg escapes one path segment.
 func Seg(s string) string { return url.PathEscape(s) }
 

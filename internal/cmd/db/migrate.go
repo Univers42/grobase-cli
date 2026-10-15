@@ -76,7 +76,7 @@ func runMigrate(ctx context.Context, e *env.Env, tenant, mountRef string, args [
 	results := make([]map[string]any, 0, len(migrations))
 	for _, m := range migrations {
 		var out map[string]any
-		req := tenantRequest(http.MethodPost, migratePath, tenant, migrateBody(tenant, mount, m))
+		req := httpx.TenantRequest(http.MethodPost, migratePath, tenant, migrateBody(tenant, mount, m))
 		if err := cl.JSON(ctx, req, &out); err != nil {
 			if len(results) > 0 {
 				_ = printMigrations(e, results)
