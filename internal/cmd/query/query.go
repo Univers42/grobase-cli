@@ -28,7 +28,7 @@ func New(e *env.Env) *cobra.Command {
 			"  schema   show the tables and columns of a database",
 	}
 	// Every subcommand authenticates the same way, so --mode lives on the parent.
-	mode := c.PersistentFlags().String("mode", "auto", "credential to send: auto, user, service, apikey, anon or none")
+	mode := c.PersistentFlags().String("mode", "auto", "credential to send: auto (a stored API key before the session), user, service, apikey, anon or none")
 	c.AddCommand(newRunCmd(e, mode), newCrudCmd(e, mode), newEnginesCmd(e, mode), newSchemaCmd(e, mode))
 	return c
 }

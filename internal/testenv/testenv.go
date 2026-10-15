@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Univers42/grobase-cli/internal/auth"
 	"github.com/Univers42/grobase-cli/internal/config"
 	"github.com/Univers42/grobase-cli/internal/env"
 	"github.com/Univers42/grobase-cli/internal/secret"
@@ -73,6 +74,18 @@ func New(t *testing.T, handler http.Handler, creds map[string]string, stdin stri
 		}
 	}
 	return h
+}
+
+// Session encodes a login session for the creds of New, valid for an hour past the
+// harness clock, so no request triggers a refresh.
+func Session(t *testing.T, accessToken string) string {
+	t.Helper()
+	s := auth.Session{AccessToken: accessToken, RefreshToken: "refresh-" + accessToken, ExpiresAt: fixedNow().Add(time.Hour)}
+	enc, err := s.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return enc
 }
 
 // Run executes cmd with args, returning its error. Output is in h.Out / h.Err.

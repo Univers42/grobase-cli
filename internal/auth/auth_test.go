@@ -86,6 +86,7 @@ func TestAuthorizeHeadersPerMode(t *testing.T) {
 		{httpx.ModeAPIKey, "anon-key", "Bearer mbk_abcdef123"},
 		{httpx.ModeAnon, "anon-key", "Bearer anon-key"},
 		{httpx.ModeAuto, "anon-key", "Bearer user-jwt"},
+		{httpx.ModeAutoAPIKeyFirst, "anon-key", "Bearer mbk_abcdef123"},
 	} {
 		h, err := headers(t, f, tc.mode)
 		if err != nil || h.Get("apikey") != tc.apikey || h.Get("Authorization") != tc.bearer {
@@ -94,7 +95,7 @@ func TestAuthorizeHeadersPerMode(t *testing.T) {
 		// The query service reads the app key only from X-Baas-Api-Key; no other
 		// credential may ever be sent under that name.
 		wantDataPlane := ""
-		if tc.mode == httpx.ModeAPIKey {
+		if tc.bearer == "Bearer mbk_abcdef123" {
 			wantDataPlane = "mbk_abcdef123"
 		}
 		if got := h.Get("X-Baas-Api-Key"); got != wantDataPlane {
@@ -113,6 +114,16 @@ func TestAutoFallsBackWithoutSession(t *testing.T) {
 	f.put(t, secret.KindServiceRole, "service-key")
 	if h, _ = headers(t, f, httpx.ModeAuto); h.Get("Authorization") != "Bearer service-key" {
 		t.Fatalf("service fallback: %v", h)
+	}
+}
+
+func TestAPIKeyFirstWithoutAnAPIKeyIsAuto(t *testing.T) {
+	f := newFixture(t, okRefresh)
+	f.put(t, secret.KindAnon, "anon-key")
+	f.putSession(t, auth.Session{AccessToken: "user-jwt", RefreshToken: "r", ExpiresAt: now.Add(time.Hour)})
+	h, err := headers(t, f, httpx.ModeAutoAPIKeyFirst)
+	if err != nil || h.Get("Authorization") != "Bearer user-jwt" || h.Get("X-Baas-Api-Key") != "" {
+		t.Fatalf("session fallback: %v %v", h, err)
 	}
 }
 

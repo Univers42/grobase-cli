@@ -75,6 +75,23 @@ func TestKeysListBothShapes(t *testing.T) {
 	}
 }
 
+// The control plane keeps preferring the session: only /query/v1 ranks a stored API key first.
+func TestKeysListSendsTheSessionOverAStoredAPIKey(t *testing.T) {
+	var gotAuth, gotDataKey string
+	h := testenv.New(t, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotAuth, gotDataKey = r.Header.Get("Authorization"), r.Header.Get("X-Baas-Api-Key")
+		_, _ = io.WriteString(rw, `[]`)
+	}), map[string]string{
+		secret.KindAnon: anonKey, secret.KindSession: testenv.Session(t, "user-jwt-keys"), secret.KindAPIKey: "mbk_keys_app_key",
+	}, "")
+	if err := h.Run(keys.New(h.Env), "list"); err != nil {
+		t.Fatalf("exit %d: %v", exitcode.Of(err), err)
+	}
+	if gotAuth != "Bearer user-jwt-keys" || gotDataKey != "" {
+		t.Fatalf("Authorization=%q X-Baas-Api-Key=%q, want the session", gotAuth, gotDataKey)
+	}
+}
+
 func TestKeysListErrorCodes(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

@@ -29,6 +29,7 @@ type request struct {
 	Method, Path, Query string
 	Body                map[string]any
 	Auth, APIKey        string
+	DataKey             string // X-Baas-Api-Key, the one credential /query/v1 reads
 }
 
 // recorder answers every call with status/body and keeps the last request.
@@ -44,6 +45,7 @@ func (r *recorder) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.last = request{
 		Method: req.Method, Path: req.URL.Path, Query: req.URL.RawQuery,
 		Auth: req.Header.Get("Authorization"), APIKey: req.Header.Get("apikey"),
+		DataKey: req.Header.Get("X-Baas-Api-Key"),
 	}
 	if req.Body != nil {
 		b, _ := io.ReadAll(req.Body)

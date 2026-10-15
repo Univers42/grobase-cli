@@ -31,6 +31,9 @@ const (
 	ModeAnon
 	// ModeNone sends no credentials.
 	ModeNone
+	// ModeAutoAPIKeyFirst is ModeAuto with a stored API key ranked above the session,
+	// for the query service (/query/v1), which accepts an app key only.
+	ModeAutoAPIKeyFirst
 )
 
 // Authorizer decorates outgoing requests with credentials.

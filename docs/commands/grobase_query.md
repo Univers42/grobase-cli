@@ -14,7 +14,7 @@ Talk to the query service of the current context:
 
 ```
   -h, --help          help for query
-      --mode string   credential to send: auto, user, service, apikey, anon or none (default "auto")
+      --mode string   credential to send: auto (a stored API key before the session), user, service, apikey, anon or none (default "auto")
 ```
 
 ### Options inherited from parent commands

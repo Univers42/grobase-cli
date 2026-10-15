@@ -35,7 +35,7 @@ func runTest(ctx context.Context, e *env.Env, id string) error {
 		return err
 	}
 	var out map[string]any
-	req := httpx.Request{Method: http.MethodGet, Path: "/query/v1/" + httpx.Seg(id) + "/tables"}
+	req := httpx.Request{Method: http.MethodGet, Path: "/query/v1/" + httpx.Seg(id) + "/tables", Mode: httpx.ModeAutoAPIKeyFirst}
 	if err := cl.JSON(ctx, req, &out); err != nil {
 		return err
 	}

@@ -143,12 +143,12 @@ func runCrud(ctx context.Context, e *env.Env, cl *httpx.Client, f crudFlags, mod
 	return printResult(e, out)
 }
 
-// parseMode maps --mode onto an httpx mode. The empty default lets the resolver
-// pick the strongest stored credential.
+// parseMode maps --mode onto an httpx mode. auto lets the resolver pick the strongest
+// stored credential the query service accepts, so an API key outranks the session.
 func parseMode(s string) (httpx.Mode, error) {
 	switch s {
 	case "", "auto":
-		return httpx.ModeAuto, nil
+		return httpx.ModeAutoAPIKeyFirst, nil
 	case "user":
 		return httpx.ModeUser, nil
 	case "service":

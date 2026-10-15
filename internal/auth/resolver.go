@@ -112,8 +112,11 @@ func need(kind, v string) (string, error) {
 
 // Authorize implements httpx.Authorizer.
 func (r *Resolver) Authorize(ctx context.Context, req *http.Request, mode httpx.Mode) error {
-	if mode == httpx.ModeAuto {
+	switch mode {
+	case httpx.ModeAuto:
 		mode = r.pick(ctx)
+	case httpx.ModeAutoAPIKeyFirst:
+		mode = r.pickAPIKeyFirst(ctx)
 	}
 	apikey, bearer, err := r.credentials(ctx, mode)
 	if err != nil {
@@ -151,6 +154,16 @@ func (r *Resolver) pick(ctx context.Context) httpx.Mode {
 		}
 	}
 	return httpx.ModeAnon
+}
+
+// pickAPIKeyFirst is pick for the query service, which rejects a session: with both
+// stored, auto mode sent the session and `grobase query engines` answered 401
+// invalid_api_key, while --mode apikey listed 10 engines (b2b, 2026-10-15).
+func (r *Resolver) pickAPIKeyFirst(ctx context.Context) httpx.Mode {
+	if v, _ := r.load(secret.KindAPIKey); v != "" {
+		return httpx.ModeAPIKey
+	}
+	return r.pick(ctx)
 }
 
 func (r *Resolver) credentials(ctx context.Context, mode httpx.Mode) (apikey, bearer string, err error) {
