@@ -180,10 +180,33 @@ func TestOpenSelection(t *testing.T) {
 	for _, c := range cases {
 		o := opts
 		o.Backend = c.backend
-		o.KeyringAvailable = func() bool { return c.kr }
+		o.KeyringProbe = func() error {
+			if c.kr {
+				return nil
+			}
+			return errors.New("no keyring")
+		}
 		_, got, err := Open(o)
 		if (err != nil) != c.wantErr || got != c.want {
 			t.Errorf("%+v: got %q, %v", c, got, err)
 		}
+	}
+}
+
+func TestOpenAutoFallbackNamesTheProbeFailure(t *testing.T) {
+	probeErr := errors.New("keyring set: dbus timeout")
+	passErr := errors.New("credential file needs a passphrase")
+	s, backend, err := Open(Options{
+		FilePath:     filepath.Join(t.TempDir(), "c"),
+		KDF:          fastKDF(),
+		Passphrase:   func() ([]byte, error) { return nil, passErr },
+		KeyringProbe: func() error { return probeErr },
+	})
+	if err != nil || backend != BackendFile {
+		t.Fatalf("Open = %q, %v; want the file fallback", backend, err)
+	}
+	_, err = s.Get("prod/anon")
+	if !errors.Is(err, probeErr) || !errors.Is(err, passErr) {
+		t.Fatalf("Get error %q must carry both the probe and the passphrase failure", err)
 	}
 }
